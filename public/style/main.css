@@ -292,14 +292,25 @@ label {
 .editor {
   background: #fff;
   height: 100%;
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  -ms-box-sizing: border-box;
+  -o-box-sizing: border-box;
+  box-sizing: border-box;
 }
 .editor textarea {
   height: 100%;
   width: 50%;
   border: 0px;
   outline: 0px;
+  font-size: 12px;
   padding: 15px 15px 15px 90px;
   position: fixed;
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  -ms-box-sizing: border-box;
+  -o-box-sizing: border-box;
+  box-sizing: border-box;
   border-right: 1px solid #d2d2d2;
 }
 /*------------------------------------*     $VIEWER
@@ -308,7 +319,7 @@ label {
   color: #222;
   cursor: text;
   padding: 0px;
-  overflow: scroll;
+  overflow-y: scroll;
 }
 .viewer-script {
   -webkit-box-sizing: content-box;

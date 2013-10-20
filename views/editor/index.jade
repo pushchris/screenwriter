@@ -11,7 +11,9 @@ block body
         div.viewer-script
 block feet
     script.  
-        var scriptText = "";
+        var autocomplete,
+            change = false,
+            characters = {};
         
         var height;
             
@@ -20,30 +22,19 @@ block feet
             $viewerScript = $('.viewer-script');
             
         $viewerScript.addClass('dpi72').addClass('us-letter');
+        autocomplete = $editor.find('textarea').tagSuggest({ tags: characters });
         
-        
-        $editor.find('textarea').on('change keyup', function() {
-            fountain.parse($(this).val(), function (result) {
-                if(result) {
-                    $viewerScript.html('');
-                    if(result.title && result.html.title_page) {
-                        $viewerScript.append(page(result.html.title_page, true));
-                        //$title.html(result.title || 'Untitled');
-                    }
-                    $viewerScript.append(page(result.html.script));
-                }
-            }); 
-        });
-        
+        var parseStringForArray = function(string) {
+            return string.replace(/ *\([^)]*\) */g, "").replace(/[^a-z0-9\s]/gi, '').replace(/[_\s]/g, '');
+        }
+        var removeParentheticals = function(string) {
+            return string.replace(/ *\([^)]*\) */g, "");
+        }
         var resize = function() {
             height = $(window).innerHeight();
             $viewer.height(height);
             $editor.height(height);
         }
-        
-        $(window).resize(resize);
-        resize();
-        
         var page = function(html, isTitlePage) {
             var $output = $(document.createElement('div')).addClass('viewer-script-page').html(html);
             
@@ -58,3 +49,36 @@ block feet
             }
             return $output;
         };
+        var backgroundFunctions = function() {
+            if(change) {
+                fountain.parse($editor.find('textarea').val(), true, function(result) {
+                    if(result) {
+                        $viewerScript.html('');
+                        if(result.title && result.html.title_page) {
+                            $viewerScript.append(page(result.html.title_page, true));
+                            //$title.html(result.title || 'Untitled');
+                        }
+                        $viewerScript.append(page(result.html.script));
+                        for(i in result.tokens) {
+                            if(result.tokens[i].type == 'character') {
+                                var char = parseStringForArray(result.tokens[i]['text']);
+                                if(!characters[char]) {
+                                    characters[char] = removeParentheticals(result.tokens[i]['text']);
+                                }
+                            }
+                        }
+                        console.log(characters);
+                        autocomplete.setTags(characters);
+                    } 
+                });    
+            }
+            change = false;
+        }
+        
+        $editor.find('textarea').on('change keyup', function() { 
+            change = true;
+        });
+        
+        $(window).resize(resize);
+        resize();
+        setInterval(backgroundFunctions, 3000);
