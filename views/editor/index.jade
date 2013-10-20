@@ -1,0 +1,60 @@
+extends ../../layouts/default
+
+block head
+    title Screenwriter
+
+block body
+    section(class="editor t50")
+        section.nav
+        textarea
+    section(class="viewer t50")
+        div.viewer-script
+block feet
+    script.  
+        var scriptText = "";
+        
+        var height;
+            
+        var $editor = $('.editor'),
+            $viewer = $('.viewer'),
+            $viewerScript = $('.viewer-script');
+            
+        $viewerScript.addClass('dpi72').addClass('us-letter');
+        
+        
+        $editor.find('textarea').on('change keyup', function() {
+            fountain.parse($(this).val(), function (result) {
+                if(result) {
+                    $viewerScript.html('');
+                    if(result.title && result.html.title_page) {
+                        $viewerScript.append(page(result.html.title_page, true));
+                        //$title.html(result.title || 'Untitled');
+                    }
+                    $viewerScript.append(page(result.html.script));
+                }
+            }); 
+        });
+        
+        var resize = function() {
+            height = $(window).innerHeight();
+            $viewer.height(height);
+            $editor.height(height);
+        }
+        
+        $(window).resize(resize);
+        resize();
+        
+        var page = function(html, isTitlePage) {
+            var $output = $(document.createElement('div')).addClass('viewer-script-page').html(html);
+            
+            if (isTitlePage) {
+                $output.addClass('title-page');
+            } else {
+                $output.children('div.dialogue.dual').each(function() {
+                    dual = $(this).prev('div.dialogue');
+                    $(this).wrap($(document.createElement('div')).addClass('dual-dialogue'));
+                    dual.prependTo($(this).parent());
+                });
+            }
+            return $output;
+        };

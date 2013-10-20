@@ -1,0 +1,631 @@
+/*------------------------------------*     $CONTENTS
+\*------------------------------------*/
+/**
+ * CONTENTS............You're reading it!
+ * RESET...............Set our reset defaults
+ * FONT-FACE...........Import brand font files
+ * STYLUS MIXIN........Set of functions to make cross-browser easier
+ * GRID
+ * ELEMENTS
+ * LAYOUT
+ * 
+ */
+/*------------------------------------*     $RESET
+\*------------------------------------*/
+html,
+body,
+div,
+span,
+applet,
+object,
+iframe,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+blockquote,
+pre,
+a,
+abbr,
+acronym,
+address,
+big,
+cite,
+code,
+del,
+dfn,
+em,
+img,
+ins,
+kbd,
+q,
+s,
+samp,
+small,
+strike,
+strong,
+sub,
+sup,
+tt,
+var,
+b,
+u,
+i,
+center,
+dl,
+dt,
+dd,
+ol,
+ul,
+li,
+fieldset,
+form,
+label,
+legend,
+table,
+caption,
+tbody,
+tfoot,
+thead,
+tr,
+th,
+td,
+article,
+aside,
+canvas,
+details,
+embed,
+figure,
+figcaption,
+footer,
+header,
+hgroup,
+menu,
+nav,
+output,
+ruby,
+section,
+summary,
+time,
+mark,
+audio,
+video {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 100%;
+  font: inherit;
+  vertical-align: baseline;
+}
+* {
+  box-sizing: border-box;
+}
+/* HTML5 display-role reset for older browsers */
+article,
+aside,
+details,
+figcaption,
+figure,
+footer,
+header,
+hgroup,
+menu,
+nav,
+section {
+  display: block;
+}
+body {
+  line-height: 1;
+}
+ol,
+ul {
+  list-style: none;
+}
+blockquote,
+q {
+  quotes: none;
+}
+blockquote:before,
+blockquote:after,
+q:before,
+q:after {
+  content: '';
+  content: none;
+}
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+/*------------------------------------*     $FONT-FACE
+\*------------------------------------*/
+/*------------------------------------*     $STYLUS MIXIN
+\*------------------------------------*/
+/*------------------------------------*     $GRID
+\*------------------------------------*/
+.t1 {
+  width: 1%;
+}
+.t2 {
+  width: 2%;
+}
+.t10 {
+  width: 10%;
+}
+.t20 {
+  width: 20%;
+}
+.t25 {
+  width: 25%;
+}
+/* 1/4 */
+.t30 {
+  width: 30%;
+}
+.t32 {
+  width: 32%;
+}
+.t33 {
+  width: 33.33333%;
+}
+/* 1/3 */
+.t40 {
+  width: 40%;
+}
+.t50 {
+  width: 50%;
+}
+/* 1/2 */
+.t60 {
+  width: 60%;
+}
+.t64 {
+  width: 64%;
+}
+.t66 {
+  width: 66.66666%;
+}
+/* 2/3 */
+.t70 {
+  width: 70%;
+}
+.t75 {
+  width: 75%;
+}
+/* 3/4*/
+.t80 {
+  width: 80%;
+}
+.t90 {
+  width: 90%;
+}
+.t100 {
+  width: 100%;
+}
+/*------------------------------------*     $ELEMENTS
+\*------------------------------------*/
+body {
+  background: #f6f6f6;
+  font: 17px/28px "Georgia", serif;
+  color: #333;
+}
+a {
+  text-decoration: none;
+}
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: "Helvetica Neue", "Helvetica", sans-serif;
+  font-weight: 400;
+  color: #000;
+  text-rendering: optimizeLegibility;
+}
+p {
+  margin: 0 0 28px 0;
+}
+strong {
+  font-weight: bold;
+}
+sup {
+  font-size: 0.7em;
+  vertical-align: top;
+  line-height: 1.15em;
+}
+input {
+  background: #f6f6f6;
+  padding: 7px 13px 6px;
+  margin: 0px 5px;
+  font-size: 17px;
+  border: 1px solid #f3f3f3;
+  -webkit-border-radius: 4px;
+  -moz-border-radius: 4px;
+  -ms-border-radius: 4px;
+  -o-border-radius: 4px;
+  border-radius: 4px;
+}
+label {
+  display: block;
+  margin: 5px 0px 0px 0px;
+}
+/*------------------------------------*     $LAYOUT
+\*------------------------------------*/
+.wrapper,
+.viewer,
+.editor {
+  position: relative;
+}
+.viewer,
+.editor {
+  float: left;
+}
+.viewer {
+  max-width: 850px;
+}
+.nav {
+  width: 75px;
+  height: 100%;
+  position: fixed;
+  top: 0px;
+  left: 0px;
+}
+.drop-shadow {
+  -webkit-box-shadow: 0px 1px 3px rgba(0,0,0,0.365);
+  -moz-box-shadow: 0px 1px 3px rgba(0,0,0,0.365);
+  -ms-box-shadow: 0px 1px 3px rgba(0,0,0,0.365);
+  -o-box-shadow: 0px 1px 3px rgba(0,0,0,0.365);
+  box-shadow: 0px 1px 3px rgba(0,0,0,0.365);
+}
+/*------------------------------------*     $NAV
+\*------------------------------------*/
+.nav {
+  background: #3e4753;
+  color: #eee;
+  z-index: 100;
+}
+/*------------------------------------*     $EDITOR
+\*------------------------------------*/
+.editor {
+  background: #fff;
+  height: 100%;
+}
+.editor textarea {
+  height: 100%;
+  width: 50%;
+  border: 0px;
+  outline: 0px;
+  padding: 15px 15px 15px 90px;
+  position: fixed;
+  border-right: 1px solid #d2d2d2;
+}
+/*------------------------------------*     $VIEWER
+\*------------------------------------*/
+.viewer {
+  color: #222;
+  cursor: text;
+  padding: 0px;
+  overflow: scroll;
+}
+.viewer-script {
+  -webkit-box-sizing: content-box;
+  -moz-box-sizing: content-box;
+  -ms-box-sizing: content-box;
+  -o-box-sizing: content-box;
+  box-sizing: content-box;
+  position: relative;
+  left: 50%;
+}
+.viewer-script-page {
+  background: #fff;
+  -webkit-border-radius: 2px;
+  -moz-border-radius: 2px;
+  -ms-border-radius: 2px;
+  -o-border-radius: 2px;
+  border-radius: 2px;
+  color: #222;
+  cursor: text;
+  font: Courier, "Courier New", monospace;
+  letter-spacing: 0 !important;
+  font-family: "Courier Final Draft", Courier, Courier New, monospace;
+  line-height: 107.5%;
+  margin: 0px auto 25px auto;
+  position: relative;
+  text-align: left;
+  width: 100%;
+  z-index: 200;
+  -webkit-box-shadow: 0 0 5px rgba(0,0,0,0.1);
+  -moz-box-shadow: 0 0 5px rgba(0,0,0,0.1);
+  -ms-box-shadow: 0 0 5px rgba(0,0,0,0.1);
+  -o-box-shadow: 0 0 5px rgba(0,0,0,0.1);
+  box-shadow: 0 0 5px rgba(0,0,0,0.1);
+  border: 1px solid #d2d2d2;
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  -ms-box-sizing: border-box;
+  -o-box-sizing: border-box;
+  box-sizing: border-box;
+}
+.viewer-script.dpi72 .viewer-script-page {
+  font-size: 12px;
+  padding: 72px 72px 72px 108px;
+}
+.viewer-script.dpi100 .viewer-script-page {
+  font-size: 16px;
+  padding: 100px 100px 100px 150px;
+  margin-left: -425px;
+}
+.viewer-script.dpi150 .viewer-script-page {
+  font-size: 33px;
+  padding: 150px 150px 150px 225px;
+  margin-left: -637px;
+}
+.viewer-script h1,
+.viewer-script h2,
+.viewer-script h3,
+.viewer-script h4,
+.viewer-script p {
+  margin: 1em 0;
+}
+.viewer-script.dpi72 h1,
+.viewer-script.dpi72 h2,
+.viewer-script.dpi72 h3,
+.viewer-script.dpi72 h4,
+.viewer-script.dpi72 p {
+  font-size: 12px;
+  font-weight: normal;
+}
+.viewer-script.dpi100 h1,
+.viewer-script.dpi100 h2,
+.viewer-script.dpi100 h3,
+.viewer-script.dpi100 h4,
+.viewer-script.dpi100 p {
+  font-size: 17px;
+  font-weight: normal;
+}
+.viewer-script.dpi150 h1,
+.viewer-script.dpi150 h2,
+.viewer-script.dpi150 h3,
+.viewer-script.dpi150 h4,
+.viewer-script.dpi150 p {
+  font-size: 33px;
+  font-weight: normal;
+}
+/* US Paper */
+.viewer-script.us-letter.dpi72 {
+  width: 612px;
+  margin-left: -306px;
+}
+/* us letter - 72 dpi - 612px x 792px - margins: 1" 1" 1" 1.5" */
+.viewer-script.us-letter.dpi100 {
+  width: 850px;
+}
+/* us letter - 100 dpi - 850px x 1100px - margins: 1" 1" 1" 1.5" */
+.viewer-script.us-letter.dpi150 {
+  width: 1275px;
+}
+/* us letter - 150 dpi - 1275px x 1650px - margins: 1" 1" 1" 1.5" */
+.viewer-script.us-letter.dpi72 {
+  min-height: 792px;
+}
+/* min height temporary until proper paging is implemented */
+.viewer-script.us-letter.dpi100 {
+  min-height: 1100px;
+}
+/* min height temporary until proper paging is implemented */
+.viewer-script.us-letter.dpi150 {
+  min-height: 1650px;
+}
+/* min height temporary until proper paging is implemented */
+.viewer-script.us-letter.dpi72 .title-page {
+  height: 792px;
+}
+/* temp for title page until paging is implemented */
+.viewer-script.us-letter.dpi100 .title-page {
+  height: 1100px;
+}
+/* temp for title page until paging is implemented */
+.viewer-script.us-letter.dpi150 .title-page {
+  height: 1650px;
+}
+/* temp for title page until paging is implemented */
+/* A4 Paper */
+.viewer-script.a4.dpi72 {
+  width: 595px;
+}
+/* us letter - 72 dpi - 595px x 842px - margins: 1" 1" 1" 1.5" */
+.viewer-script.a4.dpi100 {
+  width: 827px;
+}
+/* us letter - 72 dpi - 827px x 1169px - margins: 1" 1" 1" 1.5" */
+.viewer-script.a4.dpi150 {
+  width: 1250px;
+}
+/* us letter - 72 dpi - 1250px x 1754px - margins: 1" 1" 1" 1.5" */
+.viewer-script.a4.dpi72 {
+  height: 842px;
+}
+.viewer-script.a4.dpi100 {
+  height: 1169px;
+}
+.viewer-script.a4.dpi150 {
+  height: 1754px;
+}
+/* title page */
+.viewer-script .title-page {
+  margin-top: 25px;
+}
+.viewer-script .title-page h1 {
+  margin-top: 50%;
+  margin-bottom: 34px;
+  text-align: center;
+  width: 90.5%;
+}
+.viewer-script .title-page p.credit {
+  text-align: center;
+  width: 90.5%;
+}
+.viewer-script .title-page p.author,
+.viewer-script .title-page p.authors {
+  margin-bottom: 32px;
+  margin-top: 0;
+  text-align: center;
+  width: 90.5%;
+}
+.viewer-script .title-page p.source {
+  margin-bottom: 32px;
+  text-align: center;
+  width: 90.5%;
+}
+.viewer-script .title-page p.notes {
+  bottom: 350px;
+  position: absolute;
+  right: 0;
+  text-align: right;
+}
+.viewer-script.dpi72 .title-page p.notes {
+  bottom: 252px;
+  right: 72px;
+}
+.viewer-script.dpi100 .title-page p.notes {
+  bottom: 350px;
+  right: 100px;
+}
+.viewer-script.dpi150 .title-page p.notes {
+  bottom: 525px;
+  right: 150px;
+}
+.viewer-script .title-page p.date,
+.viewer-script .title-page p.draft-date {
+  bottom: 250px;
+  position: absolute;
+  right: 0;
+  text-align: right;
+}
+.viewer-script.dpi72 .title-page p.date,
+.viewer-script.dpi72 .title-page p.draft-date {
+  bottom: 180px;
+  right: 72px;
+}
+.viewer-script.dpi100 .title-page p.date,
+.viewer-script.dpi100 .title-page p.draft-date {
+  bottom: 250px;
+  right: 100px;
+}
+.viewer-script.dpi150 .title-page p.date,
+.viewer-script.dpi150 .title-page p.draft-date {
+  bottom: 375px;
+  right: 150px;
+}
+.viewer-script .title-page p.contact {
+  bottom: 100px;
+  position: absolute;
+  right: 0;
+  text-align: right;
+}
+.viewer-script.dpi72 .title-page p.contact {
+  bottom: 72px;
+  right: 72px;
+}
+.viewer-script.dpi100 .title-page p.contact {
+  bottom: 100px;
+  right: 100px;
+}
+.viewer-script.dpi150 .title-page p.contact {
+  bottom: 150px;
+  right: 150px;
+}
+.viewer-script .title-page p.copyright {
+  bottom: 100px;
+  position: absolute;
+  text-align: left;
+}
+.viewer-script.dpi72 .title-page p.copyright {
+  bottom: 72px;
+}
+.viewer-script.dpi100 .title-page p.copyright {
+  bottom: 100px;
+}
+.viewer-script.dpi150 .title-page p.copyright {
+  bottom: 150px;
+}
+.viewer-script h2 {
+  text-align: right;
+}
+.viewer-script h2.left-aligned {
+  text-align: left;
+}
+.viewer-script h3 {
+  position: relative;
+}
+.viewer-script h3:before {
+  color: #bbb;
+  content: '';
+  font-weight: bold;
+  left: -45px;
+  position: absolute;
+}
+.viewer-script h3:after {
+  color: #bbb;
+  content: '';
+  font-weight: bold;
+  right: -45px;
+  position: absolute;
+}
+.viewer-script div.dialogue {
+  margin-left: auto;
+  margin-right: auto;
+  width: 68%;
+}
+.viewer-script div.dialogue h4 {
+  margin-bottom: 0.75em;
+  margin-left: 23%;
+}
+.viewer-script div.dialogue p.parenthetical {
+  margin-bottom: 0;
+  margin-top: 0;
+  margin-left: 11%;
+}
+.viewer-script div.dialogue p {
+  margin-bottom: 0;
+  margin-top: 0;
+}
+.viewer-script div.dual-dialogue {
+  margin: 2em 0 0.9em 2%;
+  width: 95%;
+}
+.viewer-script div.dual-dialogue div.dialogue {
+  display: inline-block;
+  margin: 0;
+  width: 45%;
+}
+.viewer-script div.dual-dialogue div.dialogue h4 {
+  margin-top: 0;
+}
+.viewer-script div.dual-dialogue div.dialogue.right {
+  float: right;
+}
+.viewer-script p.centered {
+  text-align: center;
+  width: 92.5%;
+}
+.viewer-script p.section {
+  color: #bbb;
+  margin-left: -30px;
+}
+.viewer-script p.synopsis {
+  color: #bbb;
+  margin-left: -20px;
+}
+.viewer-script span.italic {
+  font-style: italic;
+}
+.viewer-script span.bold {
+  font-weight: bold;
+}
+.viewer-script span.underline {
+  text-decoration: underline;
+}
