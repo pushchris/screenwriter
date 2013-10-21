@@ -269,6 +269,12 @@ label {
 .viewer {
   max-width: 850px;
 }
+.editor {
+  min-width: 400px;
+}
+.editor textarea {
+  min-width: 600px;
+}
 .nav {
   width: 75px;
   height: 100%;
@@ -313,7 +319,6 @@ label {
 /*------------------------------------*     $EDITOR
 \*------------------------------------*/
 .editor {
-  background: #fff;
   height: 100%;
   -webkit-box-sizing: border-box;
   -moz-box-sizing: border-box;
