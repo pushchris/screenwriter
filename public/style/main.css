@@ -287,6 +287,26 @@ label {
   color: #eee;
   z-index: 100;
 }
+.nav-download {
+  width: 75px;
+  font-size: 11px;
+  padding: 45px 20px 25px 20px;
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  -ms-box-sizing: border-box;
+  -o-box-sizing: border-box;
+  box-sizing: border-box;
+  position: fixed;
+  bottom: 0px;
+  text-align: center;
+}
+.nav-download:before {
+  font-size: 25px;
+  width: 75px;
+  left: 0px;
+  top: 10px;
+  position: absolute;
+}
 /*------------------------------------*     $EDITOR
 \*------------------------------------*/
 .editor {
@@ -297,6 +317,10 @@ label {
   -ms-box-sizing: border-box;
   -o-box-sizing: border-box;
   box-sizing: border-box;
+  position: relative;
+}
+.editor.over textarea {
+  background: #eee;
 }
 .editor textarea {
   height: 100%;
@@ -312,6 +336,27 @@ label {
   -o-box-sizing: border-box;
   box-sizing: border-box;
   border-right: 1px solid #d2d2d2;
+}
+.editor-tag-matches {
+  position: absolute;
+  z-index: 150;
+  right: 0px;
+  margin: auto 0px;
+  height: 300px;
+  display: table;
+  vertical-align: middle;
+}
+.editor-tag-matches-inner {
+  display: table-row;
+  height: auto;
+}
+.editor-tag-matches-inner span {
+  background: #3e4753;
+  color: #eee;
+  display: block;
+  padding: 2px 10px;
+  text-transform: capitalize;
+  font-size: 16px;
 }
 /*------------------------------------*     $VIEWER
 \*------------------------------------*/
@@ -341,7 +386,7 @@ label {
   cursor: text;
   font: Courier, "Courier New", monospace;
   letter-spacing: 0 !important;
-  font-family: "Courier Final Draft", Courier, Courier New, monospace;
+  font-family: "Courier Final Draft", "Courier", "Courier New", monospace;
   line-height: 107.5%;
   margin: 0px auto 25px auto;
   position: relative;
@@ -380,6 +425,7 @@ label {
 .viewer-script h4,
 .viewer-script p {
   margin: 1em 0;
+  font-family: "Courier Final Draft", "Courier", "Courier New", monospace;
 }
 .viewer-script.dpi72 h1,
 .viewer-script.dpi72 h2,

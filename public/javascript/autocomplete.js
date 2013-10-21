@@ -15,7 +15,8 @@
     $.fn.tagSuggest = function(options) {
         
         var defaults = { 
-            'matchClass' : 'tagMatches', 
+            'matchClass' : 'editor-tag-matches', 
+            'innerMatchClass' : 'editor-tag-matches-inner',
             'tagContainer' : 'span', 
             'tagWrap' : 'span', 
             'sort' : true,
@@ -40,6 +41,12 @@
         var workingTag = "";
         var currentTag = {"position": 0, tag: ""};
         var tagMatches = document.createElement(settings.tagContainer);
+        var innerTagMatches = document.createElement('div');
+        
+        $(innerTagMatches).addClass(settings.innerMatchClass);
+        tagMatches.appendChild(innerTagMatches);
+        
+        innerTagMatches = $(innerTagMatches);
         
         function showSuggestionsDelayed(el, key) {
             if (settings.delay) {
@@ -121,14 +128,14 @@
                 }                
 
                 if (settings.sort) {
-                    matches = matches.sort();
+                    matches = matches.sort(-1);
                 }                    
 
                 for (i = 0; i < matches.length; i++) {
-                    html += '<' + settings.tagWrap + ' class="_tag_suggestion">' + matches[i] + '</' + settings.tagWrap + '>';
+                    html += '<' + settings.tagWrap + ' class="_tag_suggestion">' + matches[i].toLowerCase() + '</' + settings.tagWrap + '>';
                 }
 
-                tagMatches.html(html);
+                innerTagMatches.html(html);
                 suggestionsShow = !!(matches.length);
             } else {
                 hideSuggestions();
@@ -136,7 +143,7 @@
         }
 
         function hideSuggestions() {
-            tagMatches.empty();
+            innerTagMatches.empty();
             matches = [];
             suggestionsShow = false;
         }

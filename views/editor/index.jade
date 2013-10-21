@@ -6,6 +6,7 @@ block head
 block body
     section(class="editor t50")
         section.nav
+            div(class="nav-download icon-file-text") save
         textarea
     section(class="viewer t50")
         div.viewer-script
@@ -13,17 +14,63 @@ block feet
     script.  
         var autocomplete,
             change = false,
+            title = "",
             characters = {};
         
         var height;
             
         var $editor = $('.editor'),
             $viewer = $('.viewer'),
+            $download = $('.nav-download'),
             $viewerScript = $('.viewer-script');
             
         $viewerScript.addClass('dpi72').addClass('us-letter');
         autocomplete = $editor.find('textarea').tagSuggest({ tags: characters });
         
+        jQuery(function($) { 
+            $.extend({
+                form: function(url, data, method) {
+                    if (method == null) method = 'POST';
+                    if (data == null) data = {};
+            
+                    var form = $('<form>').attr({
+                        method: method,
+                        action: url
+                     }).css({
+                        display: 'none'
+                     });
+            
+                    var addData = function(name, data) {
+                        if ($.isArray(data)) {
+                            for (var i = 0; i < data.length; i++) {
+                                var value = data[i];
+                                addData(name + '[]', value);
+                            }
+                        } else if (typeof data === 'object') {
+                            for (var key in data) {
+                                if (data.hasOwnProperty(key)) {
+                                    addData(name + '[' + key + ']', data[key]);
+                                }
+                            }
+                        } else if (data != null) {
+                            form.append($('<input>').attr({
+                              type: 'hidden',
+                              name: String(name),
+                              value: String(data)
+                            }));
+                        }
+                    };
+            
+                    for (var key in data) {
+                        if (data.hasOwnProperty(key)) {
+                            addData(key, data[key]);
+                        }
+                    }
+            
+                    return form.appendTo('body');
+                }
+            }); 
+        });
         var parseStringForArray = function(string) {
             return string.replace(/ *\([^)]*\) */g, "").replace(/[^a-z0-9\s]/gi, '').replace(/[_\s]/g, '');
         }
@@ -34,6 +81,35 @@ block feet
             height = $(window).innerHeight();
             $viewer.height(height);
             $editor.height(height);
+        }
+        var dragOver = function (e) {
+            $(this).addClass('over');
+            e.stopPropagation();
+            e.preventDefault();
+        }
+        var dragLeave = function (e) {
+            $(this).removeClass('over');
+            e.stopPropagation();
+            e.preventDefault();
+        }
+        var loadScript = function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e = e.originalEvent;
+            
+            $(this).removeClass('over');
+            
+            var file = e.dataTransfer.files[0],
+                reader = new FileReader();
+            
+            if(file) {
+                reader.onload = function(evt) {
+                    $editor.find('textarea').val(evt.target.result);
+                    change = true;
+                }
+            
+                reader.readAsText(file);
+            }
         }
         var page = function(html, isTitlePage) {
             var $output = $(document.createElement('div')).addClass('viewer-script-page').html(html);
@@ -48,7 +124,7 @@ block feet
                 });
             }
             return $output;
-        };
+        }
         var backgroundFunctions = function() {
             if(change) {
                 fountain.parse($editor.find('textarea').val(), true, function(result) {
@@ -56,7 +132,7 @@ block feet
                         $viewerScript.html('');
                         if(result.title && result.html.title_page) {
                             $viewerScript.append(page(result.html.title_page, true));
-                            //$title.html(result.title || 'Untitled');
+                            title = result.title || 'Untitled';
                         }
                         $viewerScript.append(page(result.html.script));
                         for(i in result.tokens) {
@@ -78,6 +154,17 @@ block feet
         $editor.find('textarea').on('change keyup', function() { 
             change = true;
         });
+        $editor.on('dragleave', dragLeave).on('dragover', dragOver).on('drop', loadScript);
+        $download.on('click', function() {
+            console.log($editor.find('textarea').val());
+            $.form('/download', { type: "fountain", filename: title, content: $editor.find('textarea').val() }).submit();
+        });
+        
+        if (window.File && window.FileReader && window.FileList && window.Blob) {
+
+        } else {
+            alert('The File APIs are not fully supported in this browser.');
+        }
         
         $(window).resize(resize);
         resize();
