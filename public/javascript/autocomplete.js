@@ -241,7 +241,7 @@
         }
 
         tagsElm.after(tagMatches).keypress(handleKeys).keyup(handleKeys).blur(function () {
-            if (fromTab == true || suggestionsShow) { // tweak to support tab selection for Opera & IE
+            if (fromTab == true || suggestionsShow) {
                 fromTab = false;
                 tagsElm.focus();
             }

@@ -1,5 +1,12 @@
+var fs = require('fs');
+
 exports.view = function(req, res) {
-    res.render('editor/index');
+    fs.readFile(__dirname + '/../../sample/Screenwriter.fountain', function (err, data) {
+        if (err) throw err;
+        res.render('editor/index', {
+            screenplay: data
+        });
+    });
 }
 exports.download = function(req, res) {
 

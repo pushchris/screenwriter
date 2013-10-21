@@ -1,0 +1,11 @@
+{
+    "name": "screenwriter",
+    "dependencies": {
+        "component/debounce": "*",
+        "component/bind": "*",
+        "component/pager": "*",
+        "segmentio/validate": "*",
+        "component/os": "*",
+        "visionmedia/superagent": "*"
+    }
+}
