@@ -182,9 +182,6 @@ label {
 /*------------------------------------*\
     $LAYOUT
 \*------------------------------------*/
-.wrapper {
-    min-width: 1200px;
-}
 
 .wrapper,
 .viewer,
@@ -197,8 +194,6 @@ label {
     float: left;
 }
 .viewer { max-width: 850px; }
-.editor { min-width: 400px; }
-.editor textarea { min-width: 600px; }
 
 .nav {
     width: 75px;
@@ -466,3 +461,31 @@ label {
 .viewer-script span.underline { text-decoration: underline; }
 
 
+@media only screen and (max-width: 1220px) {
+.viewer { width: 60%; }
+.editor,
+.editor textarea { 
+    width: 40%;
+}
+}
+
+@media only screen and (max-width: 1010px) {
+
+.viewer { display: none; }
+.editor,
+.editor textarea { 
+    width: 100%;
+    min-width: 320px;
+}
+.editor textarea { padding-left: 15px; }
+.nav { 
+    height: 50px; 
+    width: 100%; 
+    top: auto;
+    bottom: 0px;
+    left: 0px;
+    position: fixed;
+}
+.nav-download { display: none; }
+
+}
