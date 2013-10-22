@@ -1,11 +1,13 @@
 {
     "name": "screenwriter",
     "dependencies": {
+        "whyohwhyamihere/fountain": "*",
+        "whyohwhyamihere/post": "*",
         "component/debounce": "*",
         "component/bind": "*",
-        "component/pager": "*",
-        "segmentio/validate": "*",
+        "component/dom": "*",
         "component/os": "*",
         "visionmedia/superagent": "*"
-    }
+    },
+    "scripts": [ "components/index.js" ]
 }
