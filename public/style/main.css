@@ -139,8 +139,6 @@ table {
   border-collapse: collapse;
   border-spacing: 0;
 }
-/*------------------------------------*     $FONT-FACE
-\*------------------------------------*/
 /*------------------------------------*     $STYLUS MIXIN
 \*------------------------------------*/
 /*------------------------------------*     $GRID
@@ -301,7 +299,7 @@ label {
   text-align: center;
 }
 .nav-download:before {
-  font-size: 25px;
+  font-size: 26px;
   width: 75px;
   left: 0px;
   top: 10px;
@@ -663,6 +661,9 @@ label {
 }
 .viewer-script div.dual-dialogue div.dialogue.right {
   float: right;
+}
+.viewer-script hr {
+  page-break-before: always;
 }
 .viewer-script p.centered {
   text-align: center;

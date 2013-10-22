@@ -63,12 +63,6 @@ table {
 }
 
 
-/*------------------------------------*\
-    $FONT-FACE
-\*------------------------------------*/
-
-
-
 
 /*------------------------------------*\
     $STYLUS MIXIN
@@ -105,7 +99,6 @@ transition() {
 
 
 
-
 /*------------------------------------*\
     $GRID
 \*------------------------------------*/
@@ -128,8 +121,6 @@ transition() {
 .t80    { width:80% }
 .t90    { width:90% }
 .t100   { width:100% }
-
-
 
 
 
@@ -177,8 +168,6 @@ label {
 
 
 
-
-
 /*------------------------------------*\
     $LAYOUT
 \*------------------------------------*/
@@ -207,6 +196,8 @@ label {
     box-shadow: 0px 1px 3px rgba(0,0,0,.365);
 }
 
+
+
 /*------------------------------------*\
     $NAV
 \*------------------------------------*/
@@ -225,12 +216,13 @@ label {
     text-align: center;
 }
 .nav-download:before {
-    font-size: 25px;
+    font-size: 26px;
     width: 75px;
     left: 0px;
     top: 10px;
     position: absolute;
 }
+
 
 
 /*------------------------------------*\
@@ -311,7 +303,6 @@ label {
     border: 1px solid #d2d2d2;
     box-sizing: border-box;
 }
-
 .viewer-script.dpi72 .viewer-script-page { 
     font-size: 12px; 
     padding: 72px 72px 72px 108px; 
@@ -449,6 +440,8 @@ label {
 .viewer-script div.dual-dialogue div.dialogue { display: inline-block; margin: 0; width: 45%; }
 .viewer-script div.dual-dialogue div.dialogue h4 { margin-top: 0;}
 .viewer-script div.dual-dialogue div.dialogue.right { float: right; }
+
+.viewer-script hr { page-break-before: always; }
 
 .viewer-script p { }
 .viewer-script p.centered { text-align: center; width: 92.5%; }

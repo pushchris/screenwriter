@@ -1,4 +1,6 @@
-var fs = require('fs');
+var fs = require('fs'),
+    fdx = require('../../exports/fdx'),
+    fountain = require('../../exports/fountain');
 
 exports.view = function(req, res) {
     fs.readFile(__dirname + '/../../sample/Screenwriter.fountain', function (err, data) {
@@ -10,14 +12,20 @@ exports.view = function(req, res) {
 }
 exports.download = function(req, res) {
 
-    console.log(req.body.filename);
-    var filename = req.param("filename");
-    console.log(filename);
-    var content = req.param("content");
-    console.log(content);
-    var type = req.param("type") || "fountain";
+    var toExport;
+
+    var filename = req.param("filename"),
+        content = req.param("content"),
+        tokens = req.param("tokens"),
+        type = req.param("type") || "fountain";
+    
+    if(type == "fdx")
+        toExport = fdx.convert(JSON.parse(tokens).tokens);
+    else
+        toExport = fountain.convert(content);
+
 
     res.attachment(filename + "." + type);
-    res.end(content, 'UTF-8');
+    res.end(toExport, 'UTF-8');
 
 }

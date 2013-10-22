@@ -1,7 +1,8 @@
 var autocomplete,
             change = false,
             title = "",
-            characters = {};
+            characters = {},
+            tokens = [];
         
         var height;
             
@@ -70,6 +71,7 @@ var autocomplete,
         var backgroundFunctions = function() {
             fountain.parse($editor.find('textarea').val(), true, function(result) {
                 if(result) {
+                    tokens = result;
                     $viewerScript.html('');
                     if(result.title && result.html.title_page) {
                         $viewerScript.append(page(result.html.title_page, true));
@@ -92,7 +94,7 @@ var autocomplete,
         $editor.find('textarea').on('change keyup', $.debounce(250, backgroundFunctions));
         $editor.on('dragleave', dragLeave).on('dragover', dragOver).on('drop', loadScript);
         $download.on('click', function() {
-            $.form('/download', { type: "fountain", filename: title, content: $editor.find('textarea').val() }).submit();
+            $.form('/download', { type: "fountain", filename: title, tokens: JSON.stringify(tokens), content: $editor.find('textarea').val() }).submit();
         });
         
         if (window.File && window.FileReader && window.FileList && window.Blob) {
