@@ -1,30 +1,26 @@
 var request = require('superagent'),
     dom = require('dom'),
     fountain = require('fountain'),
-    debounce = require('debounce')
-    post = require('post');
+    debounce = require('debounce'),
+    post = require('post'),
+    autocomplete = require('./autocomplete');
 
-
-var autocomplete,
-    change = false,
+var charAutocomplete,
     title = "",
     characters = {},
-    tokens = [];
-
-var height;
+    tokens = [],
+    height;
     
 var $editor = dom('.editor'),
     $viewer = dom('.viewer'),
     $download = dom('.nav-download'),
     $viewerScript = dom('.viewer-script');
-    
-    
 
 $viewerScript
     .addClass('dpi72')
     .addClass('us-letter');
 
-//autocomplete = $editor.find('textarea').tagSuggest({ tags: characters });
+charAutocomplete = autocomplete.start($editor.find('textarea'));
 
 var parseStringForArray = function(string) {
     return string.replace(/ *\([^)]*\) */g, "").replace(/[^a-z0-9\s]/gi, '').replace(/[_\s]/g, '');
@@ -32,6 +28,10 @@ var parseStringForArray = function(string) {
 
 var removeParentheticals = function(string) {
     return string.replace(/ *\([^)]*\) */g, "");
+}
+var stopEvent = function(e) {
+    e.stopPropagation();
+    e.preventDefault();
 }
 
 var resize = function() {
@@ -48,18 +48,14 @@ var resize = function() {
 
 var dragOver = function(e) {
     dom(this).addClass('over');
-    e.stopPropagation();
-    e.preventDefault();
+    stopEvent(e);
 }
 var dragLeave = function(e) {
     dom(this).removeClass('over');
-    e.stopPropagation();
-    e.preventDefault();
+    stopEvent(e);
 }
 var loadScript = function(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    e = e.originalEvent;
+    stopEvent(e);
     
     dom(this).removeClass('over');
     
@@ -69,7 +65,7 @@ var loadScript = function(e) {
     if(file) {
         reader.onload = function(evt) {
             $editor.find('textarea').val(evt.target.result);
-            change = true;
+            generateScript();
         }
     
         reader.readAsText(file);
@@ -95,6 +91,7 @@ var generateScript = function() {
     fountain.parse($editor.find('textarea').val(), true, function(result) {
         if(result) {
             tokens = result;
+            characters = [];
             $viewerScript.html('');
             if(result.title && result.html.title_page) {
                 $viewerScript.append(page(result.html.title_page, true));
@@ -109,7 +106,7 @@ var generateScript = function() {
                     }
                 }
             }
-            //autocomplete.setTags(characters);
+            charAutocomplete.setTags(characters);
         } 
     });
 }

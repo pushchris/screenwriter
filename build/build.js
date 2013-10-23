@@ -199,3248 +199,3517 @@ require.relative = function(parent) {
 
   return localRequire;
 };
-require.register("whyohwhyamihere-fountain/index.js", function(exports, require, module){
-// fountain-js 0.1.10
-// http://www.opensource.org/licenses/mit-license.php
-// Copyright (c) 2012 Matt Daly
-
-;(function() {
-  'use strict';
-
-  var regex = {
-    title_page: /^((?:title|credit|author[s]?|source|notes|draft date|date|contact|copyright)\:)/gim,
-
-    scene_heading: /^((?:\*{0,3}_?)?(?:(?:int|ext|est|i\/e)[. ]).+)|^(?:\.(?!\.+))(.+)/i,
-    scene_number: /( *#(.+)# *)/,
-
-    transition: /^((?:FADE (?:TO BLACK|OUT)|CUT TO BLACK)\.|.+ TO\:)|^(?:> *)(.+)/,
-    
-    dialogue: /^([A-Z*_]+[0-9A-Z (._\-')]*)(\^?)?(?:\n(?!\n+))([\s\S]+)/,
-    parenthetical: /^(\(.+\))$/,
-
-    action: /^(.+)/g,
-    centered: /^(?:> *)(.+)(?: *<)(\n.+)*/g,
-        
-    section: /^(#+)(?: *)(.*)/,
-    synopsis: /^(?:\=(?!\=+) *)(.*)/,
-
-    note: /^(?:\[{2}(?!\[+))(.+)(?:\]{2}(?!\[+))$/,
-    note_inline: /(?:\[{2}(?!\[+))([\s\S]+?)(?:\]{2}(?!\[+))/g,
-    boneyard: /(^\/\*|^\*\/)$/g,
-
-    page_break: /^\={3,}$/,
-    line_break: /^ {2}$/,
-
-    emphasis: /(_|\*{1,3}|_\*{1,3}|\*{1,3}_)(.+)(_|\*{1,3}|_\*{1,3}|\*{1,3}_)/g,
-    bold_italic_underline: /(_{1}\*{3}(?=.+\*{3}_{1})|\*{3}_{1}(?=.+_{1}\*{3}))(.+?)(\*{3}_{1}|_{1}\*{3})/g,
-    bold_underline: /(_{1}\*{2}(?=.+\*{2}_{1})|\*{2}_{1}(?=.+_{1}\*{2}))(.+?)(\*{2}_{1}|_{1}\*{2})/g,
-    italic_underline: /(?:_{1}\*{1}(?=.+\*{1}_{1})|\*{1}_{1}(?=.+_{1}\*{1}))(.+?)(\*{1}_{1}|_{1}\*{1})/g,
-    bold_italic: /(\*{3}(?=.+\*{3}))(.+?)(\*{3})/g,
-    bold: /(\*{2}(?=.+\*{2}))(.+?)(\*{2})/g,
-    italic: /(\*{1}(?=.+\*{1}))(.+?)(\*{1})/g,
-    underline: /(_{1}(?=.+_{1}))(.+?)(_{1})/g,
-
-    splitter: /\n{2,}/g,
-    cleaner: /^\n+|\n+$/,
-    standardizer: /\r\n|\r/g,
-    whitespacer: /^\t+|^ {3,}/gm
-  };
-
-  var lexer = function (script) {
-    return script.replace(regex.boneyard, '\n$1\n')
-                 .replace(regex.standardizer, '\n')
-                 .replace(regex.cleaner, '')
-                 .replace(regex.whitespacer, '');
-  };
-     
-  var tokenize = function (script) {
-    var src    = lexer(script).split(regex.splitter)
-      , i      = src.length, line, match, parts, text, meta, x, xlen, dual
-      , tokens = [];
-
-    while (i--) {
-      line = src[i];
-      
-      // title page
-      if (regex.title_page.test(line)) {
-        match = line.replace(regex.title_page, '\n$1').split(regex.splitter).reverse();
-        for (x = 0, xlen = match.length; x < xlen; x++) {
-          parts = match[x].replace(regex.cleaner, '').split(/\:\n*/);
-          tokens.push({ type: parts[0].trim().toLowerCase().replace(' ', '_'), text: parts[1].trim() });
-        }
-        continue;
-      }
-
-      // scene headings
-      if (match = line.match(regex.scene_heading)) {
-        text = match[1] || match[2];
-
-        if (text.indexOf('  ') !== text.length - 2) {
-          if (meta = text.match(regex.scene_number)) {
-            meta = meta[2];
-            text = text.replace(regex.scene_number, '');
-          }
-          tokens.push({ type: 'scene_heading', text: text, scene_number: meta || undefined });
-        }
-        continue;
-      }
-
-      // centered
-      if (match = line.match(regex.centered)) {
-        tokens.push({ type: 'centered', text: match[0].replace(/>|</g, '') });
-        continue;
-      }
-
-      // transitions
-      if (match = line.match(regex.transition)) {
-        tokens.push({ type: 'transition', text: match[1] || match[2] });
-        continue;
-      }
-    
-      // dialogue blocks - characters, parentheticals and dialogue
-      if (match = line.match(regex.dialogue)) {
-        if (match[1].indexOf('  ') !== match[1].length - 2) {
-          // we're iterating from the bottom up, so we need to push these backwards
-          if (match[2]) {
-            tokens.push({ type: 'dual_dialogue_end' });
-          }
-
-          tokens.push({ type: 'dialogue_end' });
-
-          parts = match[3].split(/(\(.+\))(?:\n+)/).reverse();
-
-          for (x = 0, xlen = parts.length; x < xlen; x++) {	
-            text = parts[x];
-
-            if (text.length > 0) {
-              tokens.push({ type: regex.parenthetical.test(text) ? 'parenthetical' : 'dialogue', text: text });
-            }
-          }
-
-          tokens.push({ type: 'character', text: match[1].trim() });
-          tokens.push({ type: 'dialogue_begin', dual: match[2] ? 'right' : dual ? 'left' : undefined });
-
-          if (dual) {
-            tokens.push({ type: 'dual_dialogue_begin' });
-          }
-
-          dual = match[2] ? true : false;
-          continue;
-        }
-      }
-      
-      // section
-      if (match = line.match(regex.section)) {
-        tokens.push({ type: 'section', text: match[2], depth: match[1].length });
-        continue;
-      }
-      
-      // synopsis
-      if (match = line.match(regex.synopsis)) {
-        tokens.push({ type: 'synopsis', text: match[1] });
-        continue;
-      }
-
-      // notes
-      if (match = line.match(regex.note)) {
-        tokens.push({ type: 'note', text: match[1]});
-        continue;
-      }      
-
-      // boneyard
-      if (match = line.match(regex.boneyard)) {
-        tokens.push({ type: match[0][0] === '/' ? 'boneyard_begin' : 'boneyard_end' });
-        continue;
-      }      
-
-      // page breaks
-      if (regex.page_break.test(line)) {
-        tokens.push({ type: 'page_break' });
-        continue;
-      }
-      
-      // line breaks
-      if (regex.line_break.test(line)) {
-        tokens.push({ type: 'line_break' });
-        continue;
-      }
-
-      tokens.push({ type: 'action', text: line });
-    }
-
-    return tokens;
-  };
-
-  var inline = {
-    note: '<!-- $1 -->',
-
-    line_break: '<br />',
-
-    bold_italic_underline: '<span class=\"bold italic underline\">$2</span>',
-    bold_underline: '<span class=\"bold underline\">$2</span>',
-    italic_underline: '<span class=\"italic underline\">$2</span>',
-    bold_italic: '<span class=\"bold italic\">$2</span>',
-    bold: '<span class=\"bold\">$2</span>',
-    italic: '<span class=\"italic\">$2</span>',
-    underline: '<span class=\"underline\">$2</span>'
-  };
-
-  inline.lexer = function (s) {
-    if (!s) {
-      return;
-    }  
-
-    var styles = [ 'underline', 'italic', 'bold', 'bold_italic', 'italic_underline', 'bold_underline', 'bold_italic_underline' ]
-           , i = styles.length, style, match;
-
-    s = s.replace(regex.note_inline, inline.note).replace(/\\\*/g, '[star]').replace(/\\_/g, '[underline]').replace(/\n/g, inline.line_break);
-
-   // if (regex.emphasis.test(s)) {                         // this was causing only every other occurence of an emphasis syntax to be parsed
-      while (i--) {
-        style = styles[i];
-        match = regex[style];
-   
-        if (match.test(s)) {
-          s = s.replace(match, inline[style]);
-        }
-      }
-   // }
-
-    return s.replace(/\[star\]/g, '*').replace(/\[underline\]/g, '_').trim();
-  };
-
-  var parse = function (script, toks, callback) {
-    if (callback === undefined && typeof toks === 'function') {
-      callback = toks;
-      toks = undefined;
-    }
-      
-    var tokens = tokenize(script)
-      , i      = tokens.length, token
-      , title, title_page = [], html = [], output;
-
-    while (i--) {
-      token = tokens[i];
-      token.text = inline.lexer(token.text);
-
-      switch (token.type) {
-        case 'title': title_page.push('<h1>' + token.text + '</h1>'); title = token.text.replace('<br />', ' ').replace(/<(?:.|\n)*?>/g, ''); break;
-        case 'credit': title_page.push('<p class=\"credit\">' + token.text + '</p>'); break;
-        case 'author': title_page.push('<p class=\"authors\">' + token.text + '</p>'); break;
-        case 'authors': title_page.push('<p class=\"authors\">' + token.text + '</p>'); break;
-        case 'source': title_page.push('<p class=\"source\">' + token.text + '</p>'); break;
-        case 'notes': title_page.push('<p class=\"notes\">' + token.text + '</p>'); break;
-        case 'draft_date': title_page.push('<p class=\"draft-date\">' + token.text + '</p>'); break;
-        case 'date': title_page.push('<p class=\"date\">' + token.text + '</p>'); break;
-        case 'contact': title_page.push('<p class=\"contact\">' + token.text + '</p>'); break;
-        case 'copyright': title_page.push('<p class=\"copyright\">' + token.text + '</p>'); break;
-
-        case 'scene_heading': html.push('<h3' + (token.scene_number ? ' id=\"' + token.scene_number + '\">' : '>') + token.text + '</h3>'); break;
-        case 'transition': html.push('<h2>' + token.text + '</h2>'); break;
-
-        case 'dual_dialogue_begin': html.push('<div class=\"dual-dialogue\">'); break;
-        case 'dialogue_begin': html.push('<div class=\"dialogue' + (token.dual ? ' ' + token.dual : '') + '\">'); break;
-        case 'character': html.push('<h4>' + token.text + '</h4>'); break;
-        case 'parenthetical': html.push('<p class=\"parenthetical\">' + token.text + '</p>'); break;
-        case 'dialogue': html.push('<p>' + token.text + '</p>'); break;
-        case 'dialogue_end': html.push('</div> '); break;
-        case 'dual_dialogue_end': html.push('</div> '); break;
-
-        case 'section': html.push('<p class=\"section\" data-depth=\"' + token.depth + '\">' + token.text + '</p>'); break;
-        case 'synopsis': html.push('<p class=\"synopsis\">' + token.text + '</p>'); break;
-
-        case 'note': html.push('<!-- ' + token.text + '-->'); break;
-        case 'boneyard_begin': html.push('<!-- '); break;
-        case 'boneyard_end': html.push(' -->'); break;
-
-        case 'action': html.push('<p>' + token.text + '</p>'); break;
-        case 'centered': html.push('<p class=\"centered\">' + token.text + '</p>'); break;
-        
-        case 'page_break': html.push('<hr />'); break;
-        case 'line_break': html.push('<br />'); break;
-      }
-    }
-
-    output = { title: title, html: { title_page: title_page.join(''), script: html.join('') }, tokens: toks ? tokens.reverse() : undefined };
-
-    if (typeof callback === 'function') {
-      return callback(output);
-    }
-
-    return output;
-  };
-
-  var fountain = function (script, callback) {
-    return fountain.parse(script, callback);
-  };
-    
-  fountain.parse = function (script, tokens, callback) {
-    return parse(script, tokens, callback);
-  };
-
-  if (typeof module !== 'undefined') {
-    module.exports = fountain;
-  } else {
-    this.fountain = fountain;
-  }  
-}).call(this);
-
-});
-require.register("yields-isArray/index.js", function(exports, require, module){
-
-/**
- * isArray
- */
-
-var isArray = Array.isArray;
-
-/**
- * toString
- */
-
-var str = Object.prototype.toString;
-
-/**
- * Whether or not the given `val`
- * is an array.
- *
- * example:
- *
- *        isArray([]);
- *        // > true
- *        isArray(arguments);
- *        // > false
- *        isArray('');
- *        // > false
- *
- * @param {mixed} val
- * @return {bool}
- */
-
-module.exports = isArray || function (val) {
-  return !! val && '[object Array]' == str.call(val);
-};
-
-});
-require.register("whyohwhyamihere-post/index.js", function(exports, require, module){
-var dom = require('dom'),
-    isArray = require('isArray');
-
-module.exports = function(url, data, method) {
-    if (method == null)
-        method = 'POST';
-    if (data == null)
-        data = {};
-
-    var form = document.createElement('form');
-    dom(form)
-        .attr('method', method)
-        .attr('action', url);
-    dom(form).css('display', 'none');
-
-    var addData = function(name, data) {
-        if (isArray(data)) {
-            for (var i = 0; i < data.length; i++) {
-                var value = data[i];
-                addData(name + '[]', value);
-            }
-        } else if (typeof data === 'object') {
-            for (var key in data) {
-                if (data.hasOwnProperty(key)) {
-                    addData(name + '[' + key + ']', data[key]);
-                }
-            }
-        } else if (data != null) {
-            var input = document.createElement('input');
-            dom(input)
-              .attr('type', 'hidden')
-              .attr('name', String(name))
-              .attr('value', String(data));
-            dom(form).append(dom(input));
-        }
-    };
-
-    for (var key in data) {
-        if (data.hasOwnProperty(key)) {
-            addData(key, data[key]);
-        }
-    }
-    
-    form.submit();
-}
-});
-require.register("component-debounce/index.js", function(exports, require, module){
-/**
- * Debounces a function by the given threshold.
- *
- * @see http://unscriptable.com/2009/03/20/debouncing-javascript-methods/
- * @param {Function} function to wrap
- * @param {Number} timeout in ms (`100`)
- * @param {Boolean} whether to execute at the beginning (`false`)
- * @api public
- */
-
-module.exports = function debounce(func, threshold, execAsap){
-  var timeout;
-
-  return function debounced(){
-    var obj = this, args = arguments;
-
-    function delayed () {
-      if (!execAsap) {
-        func.apply(obj, args);
-      }
-      timeout = null;
-    }
-
-    if (timeout) {
-      clearTimeout(timeout);
-    } else if (execAsap) {
-      func.apply(obj, args);
-    }
-
-    timeout = setTimeout(delayed, threshold || 100);
-  };
-};
-
-});
-require.register("component-bind/index.js", function(exports, require, module){
-
-/**
- * Slice reference.
- */
-
-var slice = [].slice;
-
-/**
- * Bind `obj` to `fn`.
- *
- * @param {Object} obj
- * @param {Function|String} fn or string
- * @return {Function}
- * @api public
- */
-
-module.exports = function(obj, fn){
-  if ('string' == typeof fn) fn = obj[fn];
-  if ('function' != typeof fn) throw new Error('bind() requires a function');
-  var args = [].slice.call(arguments, 2);
-  return function(){
-    return fn.apply(obj, args.concat(slice.call(arguments)));
-  }
-};
-
-});
-require.register("component-type/index.js", function(exports, require, module){
-
-/**
- * toString ref.
- */
-
-var toString = Object.prototype.toString;
-
-/**
- * Return the type of `val`.
- *
- * @param {Mixed} val
- * @return {String}
- * @api public
- */
-
-module.exports = function(val){
-  switch (toString.call(val)) {
-    case '[object Function]': return 'function';
-    case '[object Date]': return 'date';
-    case '[object RegExp]': return 'regexp';
-    case '[object Arguments]': return 'arguments';
-    case '[object Array]': return 'array';
-    case '[object String]': return 'string';
-  }
-
-  if (val === null) return 'null';
-  if (val === undefined) return 'undefined';
-  if (val && val.nodeType === 1) return 'element';
-  if (val === Object(val)) return 'object';
-
-  return typeof val;
-};
-
-});
-require.register("component-event/index.js", function(exports, require, module){
-
-/**
- * Bind `el` event `type` to `fn`.
- *
- * @param {Element} el
- * @param {String} type
- * @param {Function} fn
- * @param {Boolean} capture
- * @return {Function}
- * @api public
- */
-
-exports.bind = function(el, type, fn, capture){
-  if (el.addEventListener) {
-    el.addEventListener(type, fn, capture || false);
-  } else {
-    el.attachEvent('on' + type, fn);
-  }
-  return fn;
-};
-
-/**
- * Unbind `el` event `type`'s callback `fn`.
- *
- * @param {Element} el
- * @param {String} type
- * @param {Function} fn
- * @param {Boolean} capture
- * @return {Function}
- * @api public
- */
-
-exports.unbind = function(el, type, fn, capture){
-  if (el.removeEventListener) {
-    el.removeEventListener(type, fn, capture || false);
-  } else {
-    el.detachEvent('on' + type, fn);
-  }
-  return fn;
-};
-
-});
-require.register("component-delegate/index.js", function(exports, require, module){
-
-/**
- * Module dependencies.
- */
-
-var matches = require('matches-selector')
-  , event = require('event');
-
-/**
- * Delegate event `type` to `selector`
- * and invoke `fn(e)`. A callback function
- * is returned which may be passed to `.unbind()`.
- *
- * @param {Element} el
- * @param {String} selector
- * @param {String} type
- * @param {Function} fn
- * @param {Boolean} capture
- * @return {Function}
- * @api public
- */
-
-exports.bind = function(el, selector, type, fn, capture){
-  return event.bind(el, type, function(e){
-    if (matches(e.target, selector)) fn(e);
-  }, capture);
-  return callback;
-};
-
-/**
- * Unbind event `type`'s callback `fn`.
- *
- * @param {Element} el
- * @param {String} type
- * @param {Function} fn
- * @param {Boolean} capture
- * @api public
- */
-
-exports.unbind = function(el, type, fn, capture){
-  event.unbind(el, type, fn, capture);
-};
-
-});
-require.register("component-indexof/index.js", function(exports, require, module){
-
-var indexOf = [].indexOf;
-
-module.exports = function(arr, obj){
-  if (indexOf) return arr.indexOf(obj);
-  for (var i = 0; i < arr.length; ++i) {
-    if (arr[i] === obj) return i;
-  }
-  return -1;
-};
-});
-require.register("component-domify/index.js", function(exports, require, module){
-
-/**
- * Expose `parse`.
- */
-
-module.exports = parse;
-
-/**
- * Wrap map from jquery.
- */
-
-var map = {
-  option: [1, '<select multiple="multiple">', '</select>'],
-  optgroup: [1, '<select multiple="multiple">', '</select>'],
-  legend: [1, '<fieldset>', '</fieldset>'],
-  thead: [1, '<table>', '</table>'],
-  tbody: [1, '<table>', '</table>'],
-  tfoot: [1, '<table>', '</table>'],
-  colgroup: [1, '<table>', '</table>'],
-  caption: [1, '<table>', '</table>'],
-  tr: [2, '<table><tbody>', '</tbody></table>'],
-  td: [3, '<table><tbody><tr>', '</tr></tbody></table>'],
-  th: [3, '<table><tbody><tr>', '</tr></tbody></table>'],
-  col: [2, '<table><tbody></tbody><colgroup>', '</colgroup></table>'],
-  _default: [0, '', '']
-};
-
-/**
- * Parse `html` and return the children.
- *
- * @param {String} html
- * @return {Array}
- * @api private
- */
-
-function parse(html) {
-  if ('string' != typeof html) throw new TypeError('String expected');
-
-  // tag name
-  var m = /<([\w:]+)/.exec(html);
-  if (!m) throw new Error('No elements were generated.');
-  var tag = m[1];
-
-  // body support
-  if (tag == 'body') {
-    var el = document.createElement('html');
-    el.innerHTML = html;
-    return el.removeChild(el.lastChild);
-  }
-
-  // wrap map
-  var wrap = map[tag] || map._default;
-  var depth = wrap[0];
-  var prefix = wrap[1];
-  var suffix = wrap[2];
-  var el = document.createElement('div');
-  el.innerHTML = prefix + html + suffix;
-  while (depth--) el = el.lastChild;
-
-  var els = el.children;
-  if (1 == els.length) {
-    return el.removeChild(els[0]);
-  }
-
-  var fragment = document.createDocumentFragment();
-  while (els.length) {
-    fragment.appendChild(el.removeChild(els[0]));
-  }
-
-  return fragment;
-}
-
-});
-require.register("component-classes/index.js", function(exports, require, module){
-
-/**
- * Module dependencies.
- */
-
-var index = require('indexof');
-
-/**
- * Whitespace regexp.
- */
-
-var re = /\s+/;
-
-/**
- * toString reference.
- */
-
-var toString = Object.prototype.toString;
-
-/**
- * Wrap `el` in a `ClassList`.
- *
- * @param {Element} el
- * @return {ClassList}
- * @api public
- */
-
-module.exports = function(el){
-  return new ClassList(el);
-};
-
-/**
- * Initialize a new ClassList for `el`.
- *
- * @param {Element} el
- * @api private
- */
-
-function ClassList(el) {
-  this.el = el;
-  this.list = el.classList;
-}
-
-/**
- * Add class `name` if not already present.
- *
- * @param {String} name
- * @return {ClassList}
- * @api public
- */
-
-ClassList.prototype.add = function(name){
-  // classList
-  if (this.list) {
-    this.list.add(name);
-    return this;
-  }
-
-  // fallback
-  var arr = this.array();
-  var i = index(arr, name);
-  if (!~i) arr.push(name);
-  this.el.className = arr.join(' ');
-  return this;
-};
-
-/**
- * Remove class `name` when present, or
- * pass a regular expression to remove
- * any which match.
- *
- * @param {String|RegExp} name
- * @return {ClassList}
- * @api public
- */
-
-ClassList.prototype.remove = function(name){
-  if ('[object RegExp]' == toString.call(name)) {
-    return this.removeMatching(name);
-  }
-
-  // classList
-  if (this.list) {
-    this.list.remove(name);
-    return this;
-  }
-
-  // fallback
-  var arr = this.array();
-  var i = index(arr, name);
-  if (~i) arr.splice(i, 1);
-  this.el.className = arr.join(' ');
-  return this;
-};
-
-/**
- * Remove all classes matching `re`.
- *
- * @param {RegExp} re
- * @return {ClassList}
- * @api private
- */
-
-ClassList.prototype.removeMatching = function(re){
-  var arr = this.array();
-  for (var i = 0; i < arr.length; i++) {
-    if (re.test(arr[i])) {
-      this.remove(arr[i]);
-    }
-  }
-  return this;
-};
-
-/**
- * Toggle class `name`.
- *
- * @param {String} name
- * @return {ClassList}
- * @api public
- */
-
-ClassList.prototype.toggle = function(name){
-  // classList
-  if (this.list) {
-    this.list.toggle(name);
-    return this;
-  }
-
-  // fallback
-  if (this.has(name)) {
-    this.remove(name);
-  } else {
-    this.add(name);
-  }
-  return this;
-};
-
-/**
- * Return an array of classes.
- *
- * @return {Array}
- * @api public
- */
-
-ClassList.prototype.array = function(){
-  var str = this.el.className.replace(/^\s+|\s+$/g, '');
-  var arr = str.split(re);
-  if ('' === arr[0]) arr.shift();
-  return arr;
-};
-
-/**
- * Check if class `name` is present.
- *
- * @param {String} name
- * @return {ClassList}
- * @api public
- */
-
-ClassList.prototype.has =
-ClassList.prototype.contains = function(name){
-  return this.list
-    ? this.list.contains(name)
-    : !! ~index(this.array(), name);
-};
-
-});
-require.register("component-css/index.js", function(exports, require, module){
-
-/**
- * Properties to ignore appending "px".
- */
-
-var ignore = {
-  columnCount: true,
-  fillOpacity: true,
-  fontWeight: true,
-  lineHeight: true,
-  opacity: true,
-  orphans: true,
-  widows: true,
-  zIndex: true,
-  zoom: true
-};
-
-/**
- * Set `el` css values.
- *
- * @param {Element} el
- * @param {Object} obj
- * @return {Element}
- * @api public
- */
-
-module.exports = function(el, obj){
-  for (var key in obj) {
-    var val = obj[key];
-    if ('number' == typeof val && !ignore[key]) val += 'px';
-    el.style[key] = val;
-  }
-  return el;
-};
-
-});
-require.register("component-sort/index.js", function(exports, require, module){
-
-/**
- * Expose `sort`.
- */
-
-exports = module.exports = sort;
-
-/**
- * Sort `el`'s children with the given `fn(a, b)`.
- *
- * @param {Element} el
- * @param {Function} fn
- * @api public
- */
-
-function sort(el, fn) {
-  var arr = [].slice.call(el.children).sort(fn);
-  var frag = document.createDocumentFragment();
-  for (var i = 0; i < arr.length; i++) {
-    frag.appendChild(arr[i]);
-  }
-  el.appendChild(frag);
-};
-
-/**
- * Sort descending.
- *
- * @param {Element} el
- * @param {Function} fn
- * @api public
- */
-
-exports.desc = function(el, fn){
-  sort(el, function(a, b){
-    return ~fn(a, b) + 1;
-  });
-};
-
-/**
- * Sort ascending.
- */
-
-exports.asc = sort;
-
-});
-require.register("component-value/index.js", function(exports, require, module){
-
-/**
- * Module dependencies.
- */
-
-var typeOf = require('type');
-
-/**
- * Set or get `el`'s' value.
- *
- * @param {Element} el
- * @param {Mixed} val
- * @return {Mixed}
- * @api public
- */
-
-module.exports = function(el, val){
-  if (2 == arguments.length) return set(el, val);
-  return get(el);
-};
-
-/**
- * Get `el`'s value.
- */
-
-function get(el) {
-  switch (type(el)) {
-    case 'checkbox':
-    case 'radio':
-      if (el.checked) {
-        var attr = el.getAttribute('value');
-        return null == attr ? true : attr;
-      } else {
-        return false;
-      }
-    case 'radiogroup':
-      for (var i = 0, radio; radio = el[i]; i++) {
-        if (radio.checked) return radio.value;
-      }
-      break;
-    case 'select':
-      for (var i = 0, option; option = el.options[i]; i++) {
-        if (option.selected) return option.value;
-      }
-      break;
-    default:
-      return el.value;
-  }
-}
-
-/**
- * Set `el`'s value.
- */
-
-function set(el, val) {
-  switch (type(el)) {
-    case 'checkbox':
-    case 'radio':
-      if (val) {
-        el.checked = true;
-      } else {
-        el.checked = false;
-      }
-      break;
-    case 'radiogroup':
-      for (var i = 0, radio; radio = el[i]; i++) {
-        radio.checked = radio.value === val;
-      }
-      break;
-    case 'select':
-      for (var i = 0, option; option = el.options[i]; i++) {
-        option.selected = option.value === val;
-      }
-      break;
-    default:
-      el.value = val;
-  }
-}
-
-/**
- * Element type.
- */
-
-function type(el) {
-  var group = 'array' == typeOf(el) || 'object' == typeOf(el);
-  if (group) el = el[0];
-  var name = el.nodeName.toLowerCase();
-  var type = el.getAttribute('type');
-
-  if (group && type && 'radio' == type.toLowerCase()) return 'radiogroup';
-  if ('input' == name && type && 'checkbox' == type.toLowerCase()) return 'checkbox';
-  if ('input' == name && type && 'radio' == type.toLowerCase()) return 'radio';
-  if ('select' == name) return 'select';
-  return name;
-}
-
-});
-require.register("component-query/index.js", function(exports, require, module){
-
-function one(selector, el) {
-  return el.querySelector(selector);
-}
-
-exports = module.exports = function(selector, el){
-  el = el || document;
-  return one(selector, el);
-};
-
-exports.all = function(selector, el){
-  el = el || document;
-  return el.querySelectorAll(selector);
-};
-
-exports.engine = function(obj){
-  if (!obj.one) throw new Error('.one callback required');
-  if (!obj.all) throw new Error('.all callback required');
-  one = obj.one;
-  exports.all = obj.all;
-};
-
-});
-require.register("component-matches-selector/index.js", function(exports, require, module){
-/**
- * Module dependencies.
- */
-
-var query = require('query');
-
-/**
- * Element prototype.
- */
-
-var proto = Element.prototype;
-
-/**
- * Vendor function.
- */
-
-var vendor = proto.matches
-  || proto.webkitMatchesSelector
-  || proto.mozMatchesSelector
-  || proto.msMatchesSelector
-  || proto.oMatchesSelector;
-
-/**
- * Expose `match()`.
- */
-
-module.exports = match;
-
-/**
- * Match `el` to `selector`.
- *
- * @param {Element} el
- * @param {String} selector
- * @return {Boolean}
- * @api public
- */
-
-function match(el, selector) {
-  if (vendor) return vendor.call(el, selector);
-  var nodes = query.all(selector, el.parentNode);
-  for (var i = 0; i < nodes.length; ++i) {
-    if (nodes[i] == el) return true;
-  }
-  return false;
-}
-
-});
-require.register("yields-traverse/index.js", function(exports, require, module){
-
-/**
- * dependencies
- */
-
-var matches = require('matches-selector');
-
-/**
- * Traverse with the given `el`, `selector` and `len`.
- *
- * @param {String} type
- * @param {Element} el
- * @param {String} selector
- * @param {Number} len
- * @return {Array}
- * @api public
- */
-
-module.exports = function(type, el, selector, len){
-  var el = el[type]
-    , n = len || 1
-    , ret = [];
-
-  if (!el) return ret;
-
-  do {
-    if (n == ret.length) break;
-    if (1 != el.nodeType) continue;
-    if (matches(el, selector)) ret.push(el);
-    if (!selector) ret.push(el);
-  } while (el = el[type]);
-
-  return ret;
-}
-
-});
-require.register("component-trim/index.js", function(exports, require, module){
-
-exports = module.exports = trim;
-
-function trim(str){
-  if (str.trim) return str.trim();
-  return str.replace(/^\s*|\s*$/g, '');
-}
-
-exports.left = function(str){
-  if (str.trimLeft) return str.trimLeft();
-  return str.replace(/^\s*/, '');
-};
-
-exports.right = function(str){
-  if (str.trimRight) return str.trimRight();
-  return str.replace(/\s*$/, '');
-};
-
-});
-require.register("component-dom/index.js", function(exports, require, module){
-/**
- * Module dependencies.
- */
-
-var matches = require('matches-selector');
-var delegate = require('delegate');
-var classes = require('classes');
-var traverse = require('traverse');
-var indexof = require('indexof');
-var domify = require('domify');
-var events = require('event');
-var value = require('value');
-var query = require('query');
-var type = require('type');
-var trim = require('trim');
-var css = require('css');
-
-/**
- * Attributes supported.
- */
-
-var attrs = [
-  'id',
-  'src',
-  'rel',
-  'cols',
-  'rows',
-  'type',
-  'name',
-  'href',
-  'title',
-  'style',
-  'width',
-  'height',
-  'action',
-  'method',
-  'tabindex',
-  'placeholder'
-];
-
-/**
- * Expose `dom()`.
- */
-
-exports = module.exports = dom;
-
-/**
- * Expose supported attrs.
- */
-
-exports.attrs = attrs;
-
-/**
- * Return a dom `List` for the given
- * `html`, selector, or element.
- *
- * @param {String|Element|List}
- * @return {List}
- * @api public
- */
-
-function dom(selector, context) {
-  // array
-  if (Array.isArray(selector)) {
-    return new List(selector);
-  }
-
-  // List
-  if (selector instanceof List) {
-    return selector;
-  }
-
-  // node
-  if (selector.nodeName) {
-    return new List([selector]);
-  }
-
-  if ('string' != typeof selector) {
-    throw new TypeError('invalid selector');
-  }
-
-  // html
-  var htmlselector = trim.left(selector);
-  if ('<' == htmlselector.charAt(0)) {
-    return new List([domify(htmlselector)], htmlselector);
-  }
-
-  // selector
-  var ctx = context
-    ? (context.els ? context.els[0] : context)
-    : document;
-
-  return new List(query.all(selector, ctx), selector);
-}
-
-/**
- * Expose `List` constructor.
- */
-
-exports.List = List;
-
-/**
- * Initialize a new `List` with the
- * given array-ish of `els` and `selector`
- * string.
- *
- * @param {Mixed} els
- * @param {String} selector
- * @api private
- */
-
-function List(els, selector) {
-  this.els = els || [];
-  this.selector = selector;
-}
-
-/**
- * Enumerable iterator.
- */
-
-List.prototype.__iterate__ = function(){
-  var self = this;
-  return {
-    length: function(){ return self.els.length },
-    get: function(i){ return new List([self.els[i]]) }
-  }
-};
-
-/**
- * Remove elements from the DOM.
- *
- * @api public
- */
-
-List.prototype.remove = function(){
-  for (var i = 0; i < this.els.length; i++) {
-    var el = this.els[i];
-    var parent = el.parentNode;
-    if (parent) parent.removeChild(el);
-  }
-};
-
-/**
- * Set attribute `name` to `val`, or get attr `name`.
- *
- * @param {String} name
- * @param {String} [val]
- * @return {String|List} self
- * @api public
- */
-
-List.prototype.attr = function(name, val){
-  // get
-  if (1 == arguments.length) {
-    return this.els[0] && this.els[0].getAttribute(name);
-  }
-
-  // remove
-  if (null == val) {
-    return this.removeAttr(name);
-  }
-
-  // set
-  return this.forEach(function(el){
-    el.setAttribute(name, val);
-  });
-};
-
-/**
- * Remove attribute `name`.
- *
- * @param {String} name
- * @return {List} self
- * @api public
- */
-
-List.prototype.removeAttr = function(name){
-  return this.forEach(function(el){
-    el.removeAttribute(name);
-  });
-};
-
-/**
- * Set property `name` to `val`, or get property `name`.
- *
- * @param {String} name
- * @param {String} [val]
- * @return {Object|List} self
- * @api public
- */
-
-List.prototype.prop = function(name, val){
-  if (1 == arguments.length) {
-    return this.els[0] && this.els[0][name];
-  }
-
-  return this.forEach(function(el){
-    el[name] = val;
-  });
-};
-
-/**
- * Get the first element's value or set selected
- * element values to `val`.
- *
- * @param {Mixed} [val]
- * @return {Mixed}
- * @api public
- */
-
-List.prototype.val =
-List.prototype.value = function(val){
-  if (0 == arguments.length) {
-    return this.els[0]
-      ? value(this.els[0])
-      : undefined;
-  }
-
-  return this.forEach(function(el){
-    value(el, val);
-  });
-};
-
-/**
- * Return a cloned `List` with all elements cloned.
- *
- * @return {List}
- * @api public
- */
-
-List.prototype.clone = function(){
-  var arr = [];
-  for (var i = 0, len = this.els.length; i < len; ++i) {
-    arr.push(this.els[i].cloneNode(true));
-  }
-  return new List(arr);
-};
-
-/**
- * Prepend `val`.
- *
- * @param {String|Element|List} val
- * @return {List} new list
- * @api public
- */
-
-List.prototype.prepend = function(val){
-  var el = this.els[0];
-  if (!el) return this;
-  val = dom(val);
-  for (var i = 0; i < val.els.length; ++i) {
-    if (el.children.length) {
-      el.insertBefore(val.els[i], el.firstChild);
-    } else {
-      el.appendChild(val.els[i]);
-    }
-  }
-  return val;
-};
-
-/**
- * Append `val`.
- *
- * @param {String|Element|List} val
- * @return {List} new list
- * @api public
- */
-
-List.prototype.append = function(val){
-  var el = this.els[0];
-  if (!el) return this;
-  val = dom(val);
-  for (var i = 0; i < val.els.length; ++i) {
-    el.appendChild(val.els[i]);
-  }
-  return val;
-};
-
-/**
- * Append self's `el` to `val`
- *
- * @param {String|Element|List} val
- * @return {List} self
- * @api public
- */
-
-List.prototype.appendTo = function(val){
-  dom(val).append(this);
-  return this;
-};
-
-/**
- * Insert self's `els` after `val`
- *
- * @param {String|Element|List} val
- * @return {List} self
- * @api public
- */
-
-List.prototype.insertAfter = function(val){
-  val = dom(val).els[0];
-  if (!val || !val.parentNode) return this;
-  this.forEach(function(el){
-    val.parentNode.insertBefore(el, val.nextSibling);
-  });
-  return this;
-};
-
-/**
- * Return a `List` containing the element at `i`.
- *
- * @param {Number} i
- * @return {List}
- * @api public
- */
-
-List.prototype.at = function(i){
-  return new List([this.els[i]], this.selector);
-};
-
-/**
- * Return a `List` containing the first element.
- *
- * @param {Number} i
- * @return {List}
- * @api public
- */
-
-List.prototype.first = function(){
-  return new List([this.els[0]], this.selector);
-};
-
-/**
- * Return a `List` containing the last element.
- *
- * @param {Number} i
- * @return {List}
- * @api public
- */
-
-List.prototype.last = function(){
-  return new List([this.els[this.els.length - 1]], this.selector);
-};
-
-/**
- * Return an `Element` at `i`.
- *
- * @param {Number} i
- * @return {Element}
- * @api public
- */
-
-List.prototype.get = function(i){
-  return this.els[i || 0];
-};
-
-/**
- * Return list length.
- *
- * @return {Number}
- * @api public
- */
-
-List.prototype.length = function(){
-  return this.els.length;
-};
-
-/**
- * Return element text.
- *
- * @param {String} str
- * @return {String|List}
- * @api public
- */
-
-List.prototype.text = function(str){
-  // TODO: real impl
-  if (1 == arguments.length) {
-    this.forEach(function(el){
-      el.textContent = str;
-    });
-    return this;
-  }
-
-  var str = '';
-  for (var i = 0; i < this.els.length; ++i) {
-    str += this.els[i].textContent;
-  }
-  return str;
-};
-
-/**
- * Return element html.
- *
- * @return {String} html
- * @api public
- */
-
-List.prototype.html = function(html){
-  if (1 == arguments.length) {
-    return this.forEach(function(el){
-      el.innerHTML = html;
-    });
-  }
-
-  // TODO: real impl
-  return this.els[0] && this.els[0].innerHTML;
-};
-
-/**
- * Bind to `event` and invoke `fn(e)`. When
- * a `selector` is given then events are delegated.
- *
- * @param {String} event
- * @param {String} [selector]
- * @param {Function} fn
- * @param {Boolean} capture
- * @return {List}
- * @api public
- */
-
-List.prototype.on = function(event, selector, fn, capture){
-  if ('string' == typeof selector) {
-    for (var i = 0; i < this.els.length; ++i) {
-      fn._delegate = delegate.bind(this.els[i], selector, event, fn, capture);
-    }
-    return this;
-  }
-
-  capture = fn;
-  fn = selector;
-
-  for (var i = 0; i < this.els.length; ++i) {
-    events.bind(this.els[i], event, fn, capture);
-  }
-
-  return this;
-};
-
-/**
- * Unbind to `event` and invoke `fn(e)`. When
- * a `selector` is given then delegated event
- * handlers are unbound.
- *
- * @param {String} event
- * @param {String} [selector]
- * @param {Function} fn
- * @param {Boolean} capture
- * @return {List}
- * @api public
- */
-
-List.prototype.off = function(event, selector, fn, capture){
-  if ('string' == typeof selector) {
-    for (var i = 0; i < this.els.length; ++i) {
-      // TODO: add selector support back
-      delegate.unbind(this.els[i], event, fn._delegate, capture);
-    }
-    return this;
-  }
-
-  capture = fn;
-  fn = selector;
-
-  for (var i = 0; i < this.els.length; ++i) {
-    events.unbind(this.els[i], event, fn, capture);
-  }
-  return this;
-};
-
-/**
- * Iterate elements and invoke `fn(list, i)`.
- *
- * @param {Function} fn
- * @return {List} self
- * @api public
- */
-
-List.prototype.each = function(fn){
-  for (var i = 0; i < this.els.length; ++i) {
-    fn(new List([this.els[i]], this.selector), i);
-  }
-  return this;
-};
-
-/**
- * Iterate elements and invoke `fn(el, i)`.
- *
- * @param {Function} fn
- * @return {List} self
- * @api public
- */
-
-List.prototype.forEach = function(fn){
-  for (var i = 0; i < this.els.length; ++i) {
-    fn(this.els[i], i);
-  }
-  return this;
-};
-
-/**
- * Map elements invoking `fn(list, i)`.
- *
- * @param {Function} fn
- * @return {Array}
- * @api public
- */
-
-List.prototype.map = function(fn){
-  var arr = [];
-  for (var i = 0; i < this.els.length; ++i) {
-    arr.push(fn(new List([this.els[i]], this.selector), i));
-  }
-  return arr;
-};
-
-/**
- * Filter elements invoking `fn(list, i)`, returning
- * a new `List` of elements when a truthy value is returned.
- *
- * @param {Function} fn
- * @return {List}
- * @api public
- */
-
-List.prototype.select =
-List.prototype.filter = function(fn){
-  var el;
-  var list = new List([], this.selector);
-  for (var i = 0; i < this.els.length; ++i) {
-    el = this.els[i];
-    if (fn(new List([el], this.selector), i)) list.els.push(el);
-  }
-  return list;
-};
-
-/**
- * Filter elements invoking `fn(list, i)`, returning
- * a new `List` of elements when a falsey value is returned.
- *
- * @param {Function} fn
- * @return {List}
- * @api public
- */
-
-List.prototype.reject = function(fn){
-  var el;
-  var list = new List([], this.selector);
-  for (var i = 0; i < this.els.length; ++i) {
-    el = this.els[i];
-    if (!fn(new List([el], this.selector), i)) list.els.push(el);
-  }
-  return list;
-};
-
-/**
- * Add the given class `name`.
- *
- * @param {String} name
- * @return {List} self
- * @api public
- */
-
-List.prototype.addClass = function(name){
-  var el;
-  for (var i = 0; i < this.els.length; ++i) {
-    el = this.els[i];
-    el._classes = el._classes || classes(el);
-    el._classes.add(name);
-  }
-  return this;
-};
-
-/**
- * Remove the given class `name`.
- *
- * @param {String|RegExp} name
- * @return {List} self
- * @api public
- */
-
-List.prototype.removeClass = function(name){
-  var el;
-
-  if ('regexp' == type(name)) {
-    for (var i = 0; i < this.els.length; ++i) {
-      el = this.els[i];
-      el._classes = el._classes || classes(el);
-      var arr = el._classes.array();
-      for (var j = 0; j < arr.length; j++) {
-        if (name.test(arr[j])) {
-          el._classes.remove(arr[j]);
-        }
-      }
-    }
-    return this;
-  }
-
-  for (var i = 0; i < this.els.length; ++i) {
-    el = this.els[i];
-    el._classes = el._classes || classes(el);
-    el._classes.remove(name);
-  }
-
-  return this;
-};
-
-/**
- * Toggle the given class `name`,
- * optionally a `bool` may be given
- * to indicate that the class should
- * be added when truthy.
- *
- * @param {String} name
- * @param {Boolean} bool
- * @return {List} self
- * @api public
- */
-
-List.prototype.toggleClass = function(name, bool){
-  var el;
-  var fn = 'toggle';
-
-  // toggle with boolean
-  if (2 == arguments.length) {
-    fn = bool ? 'add' : 'remove';
-  }
-
-  for (var i = 0; i < this.els.length; ++i) {
-    el = this.els[i];
-    el._classes = el._classes || classes(el);
-    el._classes[fn](name);
-  }
-
-  return this;
-};
-
-/**
- * Check if the given class `name` is present.
- *
- * @param {String} name
- * @return {Boolean}
- * @api public
- */
-
-List.prototype.hasClass = function(name){
-  var el;
-  for (var i = 0; i < this.els.length; ++i) {
-    el = this.els[i];
-    el._classes = el._classes || classes(el);
-    if (el._classes.has(name)) return true;
-  }
-  return false;
-};
-
-/**
- * Set CSS `prop` to `val` or get `prop` value.
- * Also accepts an object (`prop`: `val`)
- *
- * @param {String} prop
- * @param {Mixed} val
- * @return {List|String}
- * @api public
- */
-
-List.prototype.css = function(prop, val){
-  if (2 == arguments.length) {
-    var obj = {};
-    obj[prop] = val;
-    return this.setStyle(obj);
-  }
-
-  if ('object' == type(prop)) {
-    return this.setStyle(prop);
-  }
-
-  return this.getStyle(prop);
-};
-
-/**
- * Set CSS `props`.
- *
- * @param {Object} props
- * @return {List} self
- * @api private
- */
-
-List.prototype.setStyle = function(props){
-  for (var i = 0; i < this.els.length; ++i) {
-    css(this.els[i], props);
-  }
-  return this;
-};
-
-/**
- * Get CSS `prop` value.
- *
- * @param {String} prop
- * @return {String}
- * @api private
- */
-
-List.prototype.getStyle = function(prop){
-  var el = this.els[0];
-  if (el) return el.style[prop];
-};
-
-/**
- * Find children matching the given `selector`.
- *
- * @param {String} selector
- * @return {List}
- * @api public
- */
-
-List.prototype.find = function(selector){
-  return dom(selector, this);
-};
-
-/**
- * Empty the dom list
- *
- * @return self
- * @api public
- */
-
-List.prototype.empty = function(){
-  var elem, el;
-
-  for (var i = 0; i < this.els.length; ++i) {
-    el = this.els[i];
-    while (el.firstChild) {
-      el.removeChild(el.firstChild);
-    }
-  }
-
-  return this;
-}
-
-/**
- * Check if the first element matches `selector`.
- *
- * @param {String} selector
- * @return {Boolean}
- * @api public
- */
-
-List.prototype.is = function(selector){
-  return matches(this.get(0), selector);
-};
-
-/**
- * Get parent(s) with optional `selector` and `limit`
- *
- * @param {String} selector
- * @param {Number} limit
- * @return {List}
- * @api public
- */
-
-List.prototype.parent = function(selector, limit){
-  return new List(traverse('parentNode',
-    this.get(0),
-    selector,
-    limit
-    || 1));
-};
-
-/**
- * Get next element(s) with optional `selector` and `limit`.
- *
- * @param {String} selector
- * @param {Number} limit
- * @retrun {List}
- * @api public
- */
-
-List.prototype.next = function(selector, limit){
-  return new List(traverse('nextSibling',
-    this.get(0),
-    selector,
-    limit
-    || 1));
-};
-
-/**
- * Get previous element(s) with optional `selector` and `limit`.
- *
- * @param {String} selector
- * @param {Number} limit
- * @return {List}
- * @api public
- */
-
-List.prototype.prev =
-List.prototype.previous = function(selector, limit){
-  return new List(traverse('previousSibling',
-    this.get(0),
-    selector,
-    limit
-    || 1));
-};
-
-/**
- * Attribute accessors.
- */
-
-attrs.forEach(function(name){
-  List.prototype[name] = function(val){
-    if (0 == arguments.length) return this.attr(name);
-    return this.attr(name, val);
-  };
-});
-
-
-});
-require.register("component-os/index.js", function(exports, require, module){
-
-
-module.exports = os();
-
-function os() {
-  var ua = navigator.userAgent;
-  if (/mac/i.test(ua)) return 'mac';
-  if (/win/i.test(ua)) return 'windows';
-  if (/linux/i.test(ua)) return 'linux';
-}
-
-});
-require.register("component-emitter/index.js", function(exports, require, module){
-
-/**
- * Module dependencies.
- */
-
-var index = require('indexof');
-
-/**
- * Expose `Emitter`.
- */
-
-module.exports = Emitter;
-
-/**
- * Initialize a new `Emitter`.
- *
- * @api public
- */
-
-function Emitter(obj) {
-  if (obj) return mixin(obj);
-};
-
-/**
- * Mixin the emitter properties.
- *
- * @param {Object} obj
- * @return {Object}
- * @api private
- */
-
-function mixin(obj) {
-  for (var key in Emitter.prototype) {
-    obj[key] = Emitter.prototype[key];
-  }
-  return obj;
-}
-
-/**
- * Listen on the given `event` with `fn`.
- *
- * @param {String} event
- * @param {Function} fn
- * @return {Emitter}
- * @api public
- */
-
-Emitter.prototype.on =
-Emitter.prototype.addEventListener = function(event, fn){
-  this._callbacks = this._callbacks || {};
-  (this._callbacks[event] = this._callbacks[event] || [])
-    .push(fn);
-  return this;
-};
-
-/**
- * Adds an `event` listener that will be invoked a single
- * time then automatically removed.
- *
- * @param {String} event
- * @param {Function} fn
- * @return {Emitter}
- * @api public
- */
-
-Emitter.prototype.once = function(event, fn){
-  var self = this;
-  this._callbacks = this._callbacks || {};
-
-  function on() {
-    self.off(event, on);
-    fn.apply(this, arguments);
-  }
-
-  fn._off = on;
-  this.on(event, on);
-  return this;
-};
-
-/**
- * Remove the given callback for `event` or all
- * registered callbacks.
- *
- * @param {String} event
- * @param {Function} fn
- * @return {Emitter}
- * @api public
- */
-
-Emitter.prototype.off =
-Emitter.prototype.removeListener =
-Emitter.prototype.removeAllListeners =
-Emitter.prototype.removeEventListener = function(event, fn){
-  this._callbacks = this._callbacks || {};
-
-  // all
-  if (0 == arguments.length) {
-    this._callbacks = {};
-    return this;
-  }
-
-  // specific event
-  var callbacks = this._callbacks[event];
-  if (!callbacks) return this;
-
-  // remove all handlers
-  if (1 == arguments.length) {
-    delete this._callbacks[event];
-    return this;
-  }
-
-  // remove specific handler
-  var i = index(callbacks, fn._off || fn);
-  if (~i) callbacks.splice(i, 1);
-  return this;
-};
-
-/**
- * Emit `event` with the given args.
- *
- * @param {String} event
- * @param {Mixed} ...
- * @return {Emitter}
- */
-
-Emitter.prototype.emit = function(event){
-  this._callbacks = this._callbacks || {};
-  var args = [].slice.call(arguments, 1)
-    , callbacks = this._callbacks[event];
-
-  if (callbacks) {
-    callbacks = callbacks.slice(0);
-    for (var i = 0, len = callbacks.length; i < len; ++i) {
-      callbacks[i].apply(this, args);
-    }
-  }
-
-  return this;
-};
-
-/**
- * Return array of callbacks for `event`.
- *
- * @param {String} event
- * @return {Array}
- * @api public
- */
-
-Emitter.prototype.listeners = function(event){
-  this._callbacks = this._callbacks || {};
-  return this._callbacks[event] || [];
-};
-
-/**
- * Check if this emitter has `event` handlers.
- *
- * @param {String} event
- * @return {Boolean}
- * @api public
- */
-
-Emitter.prototype.hasListeners = function(event){
-  return !! this.listeners(event).length;
-};
-
-});
-require.register("RedVentures-reduce/index.js", function(exports, require, module){
-
-/**
- * Reduce `arr` with `fn`.
- *
- * @param {Array} arr
- * @param {Function} fn
- * @param {Mixed} initial
- *
- * TODO: combatible error handling?
- */
-
-module.exports = function(arr, fn, initial){  
-  var idx = 0;
-  var len = arr.length;
-  var curr = arguments.length == 3
-    ? initial
-    : arr[idx++];
-
-  while (idx < len) {
-    curr = fn.call(null, curr, arr[idx], ++idx, arr);
-  }
-  
-  return curr;
-};
-});
-require.register("visionmedia-superagent/lib/client.js", function(exports, require, module){
-/**
- * Module dependencies.
- */
-
-var Emitter = require('emitter');
-var reduce = require('reduce');
-
-/**
- * Root reference for iframes.
- */
-
-var root = 'undefined' == typeof window
-  ? this
-  : window;
-
-/**
- * Noop.
- */
-
-function noop(){};
-
-/**
- * Check if `obj` is a host object,
- * we don't want to serialize these :)
- *
- * TODO: future proof, move to compoent land
- *
- * @param {Object} obj
- * @return {Boolean}
- * @api private
- */
-
-function isHost(obj) {
-  var str = {}.toString.call(obj);
-
-  switch (str) {
-    case '[object File]':
-    case '[object Blob]':
-    case '[object FormData]':
-      return true;
-    default:
-      return false;
-  }
-}
-
-/**
- * Determine XHR.
- */
-
-function getXHR() {
-  if (root.XMLHttpRequest
-    && ('file:' != root.location.protocol || !root.ActiveXObject)) {
-    return new XMLHttpRequest;
-  } else {
-    try { return new ActiveXObject('Microsoft.XMLHTTP'); } catch(e) {}
-    try { return new ActiveXObject('Msxml2.XMLHTTP.6.0'); } catch(e) {}
-    try { return new ActiveXObject('Msxml2.XMLHTTP.3.0'); } catch(e) {}
-    try { return new ActiveXObject('Msxml2.XMLHTTP'); } catch(e) {}
-  }
-  return false;
-}
-
-/**
- * Removes leading and trailing whitespace, added to support IE.
- *
- * @param {String} s
- * @return {String}
- * @api private
- */
-
-var trim = ''.trim
-  ? function(s) { return s.trim(); }
-  : function(s) { return s.replace(/(^\s*|\s*$)/g, ''); };
-
-/**
- * Check if `obj` is an object.
- *
- * @param {Object} obj
- * @return {Boolean}
- * @api private
- */
-
-function isObject(obj) {
-  return obj === Object(obj);
-}
-
-/**
- * Serialize the given `obj`.
- *
- * @param {Object} obj
- * @return {String}
- * @api private
- */
-
-function serialize(obj) {
-  if (!isObject(obj)) return obj;
-  var pairs = [];
-  for (var key in obj) {
-    pairs.push(encodeURIComponent(key)
-      + '=' + encodeURIComponent(obj[key]));
-  }
-  return pairs.join('&');
-}
-
-/**
- * Expose serialization method.
- */
-
- request.serializeObject = serialize;
-
- /**
-  * Parse the given x-www-form-urlencoded `str`.
-  *
-  * @param {String} str
-  * @return {Object}
-  * @api private
-  */
-
-function parseString(str) {
-  var obj = {};
-  var pairs = str.split('&');
-  var parts;
-  var pair;
-
-  for (var i = 0, len = pairs.length; i < len; ++i) {
-    pair = pairs[i];
-    parts = pair.split('=');
-    obj[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1]);
-  }
-
-  return obj;
-}
-
-/**
- * Expose parser.
- */
-
-request.parseString = parseString;
-
-/**
- * Default MIME type map.
- *
- *     superagent.types.xml = 'application/xml';
- *
- */
-
-request.types = {
-  html: 'text/html',
-  json: 'application/json',
-  urlencoded: 'application/x-www-form-urlencoded',
-  'form': 'application/x-www-form-urlencoded',
-  'form-data': 'application/x-www-form-urlencoded'
-};
-
-/**
- * Default serialization map.
- *
- *     superagent.serialize['application/xml'] = function(obj){
- *       return 'generated xml here';
- *     };
- *
- */
-
- request.serialize = {
-   'application/x-www-form-urlencoded': serialize,
-   'application/json': JSON.stringify
- };
-
- /**
-  * Default parsers.
-  *
-  *     superagent.parse['application/xml'] = function(str){
-  *       return { object parsed from str };
-  *     };
-  *
-  */
-
-request.parse = {
-  'application/x-www-form-urlencoded': parseString,
-  'application/json': JSON.parse
-};
-
-/**
- * Parse the given header `str` into
- * an object containing the mapped fields.
- *
- * @param {String} str
- * @return {Object}
- * @api private
- */
-
-function parseHeader(str) {
-  var lines = str.split(/\r?\n/);
-  var fields = {};
-  var index;
-  var line;
-  var field;
-  var val;
-
-  lines.pop(); // trailing CRLF
-
-  for (var i = 0, len = lines.length; i < len; ++i) {
-    line = lines[i];
-    index = line.indexOf(':');
-    field = line.slice(0, index).toLowerCase();
-    val = trim(line.slice(index + 1));
-    fields[field] = val;
-  }
-
-  return fields;
-}
-
-/**
- * Return the mime type for the given `str`.
- *
- * @param {String} str
- * @return {String}
- * @api private
- */
-
-function type(str){
-  return str.split(/ *; */).shift();
-};
-
-/**
- * Return header field parameters.
- *
- * @param {String} str
- * @return {Object}
- * @api private
- */
-
-function params(str){
-  return reduce(str.split(/ *; */), function(obj, str){
-    var parts = str.split(/ *= */)
-      , key = parts.shift()
-      , val = parts.shift();
-
-    if (key && val) obj[key] = val;
-    return obj;
-  }, {});
-};
-
-/**
- * Initialize a new `Response` with the given `xhr`.
- *
- *  - set flags (.ok, .error, etc)
- *  - parse header
- *
- * Examples:
- *
- *  Aliasing `superagent` as `request` is nice:
- *
- *      request = superagent;
- *
- *  We can use the promise-like API, or pass callbacks:
- *
- *      request.get('/').end(function(res){});
- *      request.get('/', function(res){});
- *
- *  Sending data can be chained:
- *
- *      request
- *        .post('/user')
- *        .send({ name: 'tj' })
- *        .end(function(res){});
- *
- *  Or passed to `.send()`:
- *
- *      request
- *        .post('/user')
- *        .send({ name: 'tj' }, function(res){});
- *
- *  Or passed to `.post()`:
- *
- *      request
- *        .post('/user', { name: 'tj' })
- *        .end(function(res){});
- *
- * Or further reduced to a single call for simple cases:
- *
- *      request
- *        .post('/user', { name: 'tj' }, function(res){});
- *
- * @param {XMLHTTPRequest} xhr
- * @param {Object} options
- * @api private
- */
-
-function Response(req, options) {
-  options = options || {};
-  this.req = req;
-  this.xhr = this.req.xhr;
-  this.text = this.xhr.responseText;
-  this.setStatusProperties(this.xhr.status);
-  this.header = this.headers = parseHeader(this.xhr.getAllResponseHeaders());
-  // getAllResponseHeaders sometimes falsely returns "" for CORS requests, but
-  // getResponseHeader still works. so we get content-type even if getting
-  // other headers fails.
-  this.header['content-type'] = this.xhr.getResponseHeader('content-type');
-  this.setHeaderProperties(this.header);
-  this.body = this.parseBody(this.text);
-}
-
-/**
- * Get case-insensitive `field` value.
- *
- * @param {String} field
- * @return {String}
- * @api public
- */
-
-Response.prototype.get = function(field){
-  return this.header[field.toLowerCase()];
-};
-
-/**
- * Set header related properties:
- *
- *   - `.type` the content type without params
- *
- * A response of "Content-Type: text/plain; charset=utf-8"
- * will provide you with a `.type` of "text/plain".
- *
- * @param {Object} header
- * @api private
- */
-
-Response.prototype.setHeaderProperties = function(header){
-  // content-type
-  var ct = this.header['content-type'] || '';
-  this.type = type(ct);
-
-  // params
-  var obj = params(ct);
-  for (var key in obj) this[key] = obj[key];
-};
-
-/**
- * Parse the given body `str`.
- *
- * Used for auto-parsing of bodies. Parsers
- * are defined on the `superagent.parse` object.
- *
- * @param {String} str
- * @return {Mixed}
- * @api private
- */
-
-Response.prototype.parseBody = function(str){
-  var parse = request.parse[this.type];
-  return parse
-    ? parse(str)
-    : null;
-};
-
-/**
- * Set flags such as `.ok` based on `status`.
- *
- * For example a 2xx response will give you a `.ok` of __true__
- * whereas 5xx will be __false__ and `.error` will be __true__. The
- * `.clientError` and `.serverError` are also available to be more
- * specific, and `.statusType` is the class of error ranging from 1..5
- * sometimes useful for mapping respond colors etc.
- *
- * "sugar" properties are also defined for common cases. Currently providing:
- *
- *   - .noContent
- *   - .badRequest
- *   - .unauthorized
- *   - .notAcceptable
- *   - .notFound
- *
- * @param {Number} status
- * @api private
- */
-
-Response.prototype.setStatusProperties = function(status){
-  var type = status / 100 | 0;
-
-  // status / class
-  this.status = status;
-  this.statusType = type;
-
-  // basics
-  this.info = 1 == type;
-  this.ok = 2 == type;
-  this.clientError = 4 == type;
-  this.serverError = 5 == type;
-  this.error = (4 == type || 5 == type)
-    ? this.toError()
-    : false;
-
-  // sugar
-  this.accepted = 202 == status;
-  this.noContent = 204 == status || 1223 == status;
-  this.badRequest = 400 == status;
-  this.unauthorized = 401 == status;
-  this.notAcceptable = 406 == status;
-  this.notFound = 404 == status;
-  this.forbidden = 403 == status;
-};
-
-/**
- * Return an `Error` representative of this response.
- *
- * @return {Error}
- * @api public
- */
-
-Response.prototype.toError = function(){
-  var req = this.req;
-  var method = req.method;
-  var path = req.path;
-
-  var msg = 'cannot ' + method + ' ' + path + ' (' + this.status + ')';
-  var err = new Error(msg);
-  err.status = this.status;
-  err.method = method;
-  err.path = path;
-
-  return err;
-};
-
-/**
- * Expose `Response`.
- */
-
-request.Response = Response;
-
-/**
- * Initialize a new `Request` with the given `method` and `url`.
- *
- * @param {String} method
- * @param {String} url
- * @api public
- */
-
-function Request(method, url) {
-  var self = this;
-  Emitter.call(this);
-  this._query = this._query || [];
-  this.method = method;
-  this.url = url;
-  this.header = {};
-  this._header = {};
-  this.on('end', function(){
-    var res = new Response(self);
-    if ('HEAD' == method) res.text = null;
-    self.callback(null, res);
-  });
-}
-
-/**
- * Mixin `Emitter`.
- */
-
-Emitter(Request.prototype);
-
-/**
- * Set timeout to `ms`.
- *
- * @param {Number} ms
- * @return {Request} for chaining
- * @api public
- */
-
-Request.prototype.timeout = function(ms){
-  this._timeout = ms;
-  return this;
-};
-
-/**
- * Clear previous timeout.
- *
- * @return {Request} for chaining
- * @api public
- */
-
-Request.prototype.clearTimeout = function(){
-  this._timeout = 0;
-  clearTimeout(this._timer);
-  return this;
-};
-
-/**
- * Abort the request, and clear potential timeout.
- *
- * @return {Request}
- * @api public
- */
-
-Request.prototype.abort = function(){
-  if (this.aborted) return;
-  this.aborted = true;
-  this.xhr.abort();
-  this.clearTimeout();
-  this.emit('abort');
-  return this;
-};
-
-/**
- * Set header `field` to `val`, or multiple fields with one object.
- *
- * Examples:
- *
- *      req.get('/')
- *        .set('Accept', 'application/json')
- *        .set('X-API-Key', 'foobar')
- *        .end(callback);
- *
- *      req.get('/')
- *        .set({ Accept: 'application/json', 'X-API-Key': 'foobar' })
- *        .end(callback);
- *
- * @param {String|Object} field
- * @param {String} val
- * @return {Request} for chaining
- * @api public
- */
-
-Request.prototype.set = function(field, val){
-  if (isObject(field)) {
-    for (var key in field) {
-      this.set(key, field[key]);
-    }
-    return this;
-  }
-  this._header[field.toLowerCase()] = val;
-  this.header[field] = val;
-  return this;
-};
-
-/**
- * Get case-insensitive header `field` value.
- *
- * @param {String} field
- * @return {String}
- * @api private
- */
-
-Request.prototype.getHeader = function(field){
-  return this._header[field.toLowerCase()];
-};
-
-/**
- * Set Content-Type to `type`, mapping values from `request.types`.
- *
- * Examples:
- *
- *      superagent.types.xml = 'application/xml';
- *
- *      request.post('/')
- *        .type('xml')
- *        .send(xmlstring)
- *        .end(callback);
- *
- *      request.post('/')
- *        .type('application/xml')
- *        .send(xmlstring)
- *        .end(callback);
- *
- * @param {String} type
- * @return {Request} for chaining
- * @api public
- */
-
-Request.prototype.type = function(type){
-  this.set('Content-Type', request.types[type] || type);
-  return this;
-};
-
-/**
- * Set Authorization field value with `user` and `pass`.
- *
- * @param {String} user
- * @param {String} pass
- * @return {Request} for chaining
- * @api public
- */
-
-Request.prototype.auth = function(user, pass){
-  var str = btoa(user + ':' + pass);
-  this.set('Authorization', 'Basic ' + str);
-  return this;
-};
-
-/**
-* Add query-string `val`.
-*
-* Examples:
-*
-*   request.get('/shoes')
-*     .query('size=10')
-*     .query({ color: 'blue' })
-*
-* @param {Object|String} val
-* @return {Request} for chaining
-* @api public
-*/
-
-Request.prototype.query = function(val){
-  if ('string' != typeof val) val = serialize(val);
-  if (val) this._query.push(val);
-  return this;
-};
-
-/**
- * Send `data`, defaulting the `.type()` to "json" when
- * an object is given.
- *
- * Examples:
- *
- *       // querystring
- *       request.get('/search')
- *         .end(callback)
- *
- *       // multiple data "writes"
- *       request.get('/search')
- *         .send({ search: 'query' })
- *         .send({ range: '1..5' })
- *         .send({ order: 'desc' })
- *         .end(callback)
- *
- *       // manual json
- *       request.post('/user')
- *         .type('json')
- *         .send('{"name":"tj"})
- *         .end(callback)
- *
- *       // auto json
- *       request.post('/user')
- *         .send({ name: 'tj' })
- *         .end(callback)
- *
- *       // manual x-www-form-urlencoded
- *       request.post('/user')
- *         .type('form')
- *         .send('name=tj')
- *         .end(callback)
- *
- *       // auto x-www-form-urlencoded
- *       request.post('/user')
- *         .type('form')
- *         .send({ name: 'tj' })
- *         .end(callback)
- *
- *       // defaults to x-www-form-urlencoded
-  *      request.post('/user')
-  *        .send('name=tobi')
-  *        .send('species=ferret')
-  *        .end(callback)
- *
- * @param {String|Object} data
- * @return {Request} for chaining
- * @api public
- */
-
-Request.prototype.send = function(data){
-  var obj = isObject(data);
-  var type = this.getHeader('Content-Type');
-
-  // merge
-  if (obj && isObject(this._data)) {
-    for (var key in data) {
-      this._data[key] = data[key];
-    }
-  } else if ('string' == typeof data) {
-    if (!type) this.type('form');
-    type = this.getHeader('Content-Type');
-    if ('application/x-www-form-urlencoded' == type) {
-      this._data = this._data
-        ? this._data + '&' + data
-        : data;
-    } else {
-      this._data = (this._data || '') + data;
-    }
-  } else {
-    this._data = data;
-  }
-
-  if (!obj) return this;
-  if (!type) this.type('json');
-  return this;
-};
-
-/**
- * Invoke the callback with `err` and `res`
- * and handle arity check.
- *
- * @param {Error} err
- * @param {Response} res
- * @api private
- */
-
-Request.prototype.callback = function(err, res){
-  var fn = this._callback;
-  if (2 == fn.length) return fn(err, res);
-  if (err) return this.emit('error', err);
-  fn(res);
-};
-
-/**
- * Invoke callback with x-domain error.
- *
- * @api private
- */
-
-Request.prototype.crossDomainError = function(){
-  var err = new Error('Origin is not allowed by Access-Control-Allow-Origin');
-  err.crossDomain = true;
-  this.callback(err);
-};
-
-/**
- * Invoke callback with timeout error.
- *
- * @api private
- */
-
-Request.prototype.timeoutError = function(){
-  var timeout = this._timeout;
-  var err = new Error('timeout of ' + timeout + 'ms exceeded');
-  err.timeout = timeout;
-  this.callback(err);
-};
-
-/**
- * Enable transmission of cookies with x-domain requests.
- *
- * Note that for this to work the origin must not be
- * using "Access-Control-Allow-Origin" with a wildcard,
- * and also must set "Access-Control-Allow-Credentials"
- * to "true".
- *
- * @api public
- */
-
-Request.prototype.withCredentials = function(){
-  this._withCredentials = true;
-  return this;
-};
-
-/**
- * Initiate request, invoking callback `fn(res)`
- * with an instanceof `Response`.
- *
- * @param {Function} fn
- * @return {Request} for chaining
- * @api public
- */
-
-Request.prototype.end = function(fn){
-  var self = this;
-  var xhr = this.xhr = getXHR();
-  var query = this._query.join('&');
-  var timeout = this._timeout;
-  var data = this._data;
-
-  // store callback
-  this._callback = fn || noop;
-
-  // CORS
-  if (this._withCredentials) xhr.withCredentials = true;
-
-  // state change
-  xhr.onreadystatechange = function(){
-    if (4 != xhr.readyState) return;
-    if (0 == xhr.status) {
-      if (self.aborted) return self.timeoutError();
-      return self.crossDomainError();
-    }
-    self.emit('end');
-  };
-
-  // progress
-  if (xhr.upload) {
-    xhr.upload.onprogress = function(e){
-      e.percent = e.loaded / e.total * 100;
-      self.emit('progress', e);
-    };
-  }
-
-  // timeout
-  if (timeout && !this._timer) {
-    this._timer = setTimeout(function(){
-      self.abort();
-    }, timeout);
-  }
-
-  // querystring
-  if (query) {
-    query = request.serializeObject(query);
-    this.url += ~this.url.indexOf('?')
-      ? '&' + query
-      : '?' + query;
-  }
-
-  // initiate request
-  xhr.open(this.method, this.url, true);
-
-  // body
-  if ('GET' != this.method && 'HEAD' != this.method && 'string' != typeof data && !isHost(data)) {
-    // serialize stuff
-    var serialize = request.serialize[this.getHeader('Content-Type')];
-    if (serialize) data = serialize(data);
-  }
-
-  // set header fields
-  for (var field in this.header) {
-    if (null == this.header[field]) continue;
-    xhr.setRequestHeader(field, this.header[field]);
-  }
-
-  // send stuff
-  xhr.send(data);
-  return this;
-};
-
-/**
- * Expose `Request`.
- */
-
-request.Request = Request;
-
-/**
- * Issue a request:
- *
- * Examples:
- *
- *    request('GET', '/users').end(callback)
- *    request('/users').end(callback)
- *    request('/users', callback)
- *
- * @param {String} method
- * @param {String|Function} url or callback
- * @return {Request}
- * @api public
- */
-
-function request(method, url) {
-  // callback
-  if ('function' == typeof url) {
-    return new Request('GET', method).end(url);
-  }
-
-  // url first
-  if (1 == arguments.length) {
-    return new Request('GET', method);
-  }
-
-  return new Request(method, url);
-}
-
-/**
- * GET `url` with optional callback `fn(res)`.
- *
- * @param {String} url
- * @param {Mixed|Function} data or fn
- * @param {Function} fn
- * @return {Request}
- * @api public
- */
-
-request.get = function(url, data, fn){
-  var req = request('GET', url);
-  if ('function' == typeof data) fn = data, data = null;
-  if (data) req.query(data);
-  if (fn) req.end(fn);
-  return req;
-};
-
-/**
- * GET `url` with optional callback `fn(res)`.
- *
- * @param {String} url
- * @param {Mixed|Function} data or fn
- * @param {Function} fn
- * @return {Request}
- * @api public
- */
-
-request.head = function(url, data, fn){
-  var req = request('HEAD', url);
-  if ('function' == typeof data) fn = data, data = null;
-  if (data) req.send(data);
-  if (fn) req.end(fn);
-  return req;
-};
-
-/**
- * DELETE `url` with optional callback `fn(res)`.
- *
- * @param {String} url
- * @param {Function} fn
- * @return {Request}
- * @api public
- */
-
-request.del = function(url, fn){
-  var req = request('DELETE', url);
-  if (fn) req.end(fn);
-  return req;
-};
-
-/**
- * PATCH `url` with optional `data` and callback `fn(res)`.
- *
- * @param {String} url
- * @param {Mixed} data
- * @param {Function} fn
- * @return {Request}
- * @api public
- */
-
-request.patch = function(url, data, fn){
-  var req = request('PATCH', url);
-  if ('function' == typeof data) fn = data, data = null;
-  if (data) req.send(data);
-  if (fn) req.end(fn);
-  return req;
-};
-
-/**
- * POST `url` with optional `data` and callback `fn(res)`.
- *
- * @param {String} url
- * @param {Mixed} data
- * @param {Function} fn
- * @return {Request}
- * @api public
- */
-
-request.post = function(url, data, fn){
-  var req = request('POST', url);
-  if ('function' == typeof data) fn = data, data = null;
-  if (data) req.send(data);
-  if (fn) req.end(fn);
-  return req;
-};
-
-/**
- * PUT `url` with optional `data` and callback `fn(res)`.
- *
- * @param {String} url
- * @param {Mixed|Function} data or fn
- * @param {Function} fn
- * @return {Request}
- * @api public
- */
-
-request.put = function(url, data, fn){
-  var req = request('PUT', url);
-  if ('function' == typeof data) fn = data, data = null;
-  if (data) req.send(data);
-  if (fn) req.end(fn);
-  return req;
-};
-
-/**
- * Expose `request`.
- */
-
-module.exports = request;
-
-});
-require.register("screenwriter/components/index.js", function(exports, require, module){
-var request = require('superagent'),
-    dom = require('dom'),
-    fountain = require('fountain'),
-    debounce = require('debounce')
-    post = require('post');
-
-
-var autocomplete,
-    change = false,
-    title = "",
-    characters = {},
-    tokens = [];
-
-var height;
-    
-var $editor = dom('.editor'),
-    $viewer = dom('.viewer'),
-    $download = dom('.nav-download'),
-    $viewerScript = dom('.viewer-script');
-    
-    
-
-$viewerScript
-    .addClass('dpi72')
-    .addClass('us-letter');
-
-//autocomplete = $editor.find('textarea').tagSuggest({ tags: characters });
-
-var parseStringForArray = function(string) {
-    return string.replace(/ *\([^)]*\) */g, "").replace(/[^a-z0-9\s]/gi, '').replace(/[_\s]/g, '');
-}
-
-var removeParentheticals = function(string) {
-    return string.replace(/ *\([^)]*\) */g, "");
-}
-
-var resize = function() {
-    var w = window,
-        d = document,
-        e = d.documentElement,
-        g = d.getElementsByTagName('body')[0],
-        x = w.innerWidth || e.clientWidth || g.clientWidth,
-        y = w.innerHeight|| e.clientHeight|| g.clientHeight;
-        
-    $viewer.css('height', y);
-    $editor.css('height', y);
-}
-
-var dragOver = function(e) {
-    dom(this).addClass('over');
-    e.stopPropagation();
-    e.preventDefault();
-}
-var dragLeave = function(e) {
-    dom(this).removeClass('over');
-    e.stopPropagation();
-    e.preventDefault();
-}
-var loadScript = function(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    e = e.originalEvent;
-    
-    dom(this).removeClass('over');
-    
-    var file = e.dataTransfer.files[0],
-        reader = new FileReader();
-    
-    if(file) {
-        reader.onload = function(evt) {
-            $editor.find('textarea').val(evt.target.result);
-            change = true;
-        }
-    
-        reader.readAsText(file);
-    }
-}
-var page = function(html, isTitlePage) {
-    var $output = dom(document.createElement('div')).addClass('viewer-script-page').html(html);
-    
-    if (isTitlePage) {
-        $output.addClass('title-page');
-    } else {
-        /*
-$output.find('div.dialogue.dual').each(function() {
-            dual = dom(this).prev('div.dialogue');
-            dom(this).wrap(dom(document.createElement('div')).addClass('dual-dialogue'));
-            dual.prependTo($(this).parent());
-        });
-*/
-    }
-    return $output;
-}
-var generateScript = function() {
-    fountain.parse($editor.find('textarea').val(), true, function(result) {
-        if(result) {
-            tokens = result;
-            $viewerScript.html('');
-            if(result.title && result.html.title_page) {
-                $viewerScript.append(page(result.html.title_page, true));
-                title = result.title || 'Untitled';
-            }
-            $viewerScript.append(page(result.html.script));
-            for(i in result.tokens) {
-                if(result.tokens[i].type == 'character') {
-                    var char = parseStringForArray(result.tokens[i]['text']);
-                    if(!characters[char]) {
-                        characters[char] = removeParentheticals(result.tokens[i]['text']);
-                    }
-                }
-            }
-            //autocomplete.setTags(characters);
-        } 
-    });
-}
-
-$editor.find('textarea').on('keyup', debounce(generateScript, 250));
-$editor.on('dragleave', dragLeave).on('dragover', dragOver).on('drop', loadScript);
-$download.on('click', function() {
-    post('/download', { type: "fountain", filename: title, tokens: JSON.stringify(tokens), content: $editor.find('textarea').val() });
-});
-
-if (window.File && window.FileReader && window.FileList && window.Blob) {
-
-} else {
-    alert('The File APIs are not fully supported in this browser.');
-}
-
-window.onresize = resize;
-resize();
-generateScript();
-});
+require.register("whyohwhyamihere-fountain/index.js", Function("exports, require, module",
+"// fountain-js 0.1.10\n\
+// http://www.opensource.org/licenses/mit-license.php\n\
+// Copyright (c) 2012 Matt Daly\n\
+\n\
+;(function() {\n\
+  'use strict';\n\
+\n\
+  var regex = {\n\
+    title_page: /^((?:title|credit|author[s]?|source|notes|draft date|date|contact|copyright)\\:)/gim,\n\
+\n\
+    scene_heading: /^((?:\\*{0,3}_?)?(?:(?:int|ext|est|i\\/e)[. ]).+)|^(?:\\.(?!\\.+))(.+)/i,\n\
+    scene_number: /( *#(.+)# *)/,\n\
+\n\
+    transition: /^((?:FADE (?:TO BLACK|OUT)|CUT TO BLACK)\\.|.+ TO\\:)|^(?:> *)(.+)/,\n\
+    \n\
+    dialogue: /^([A-Z*_]+[0-9A-Z (._\\-')]*)(\\^?)?(?:\\n\
+(?!\\n\
++))([\\s\\S]+)/,\n\
+    parenthetical: /^(\\(.+\\))$/,\n\
+\n\
+    action: /^(.+)/g,\n\
+    centered: /^(?:> *)(.+)(?: *<)(\\n\
+.+)*/g,\n\
+        \n\
+    section: /^(#+)(?: *)(.*)/,\n\
+    synopsis: /^(?:\\=(?!\\=+) *)(.*)/,\n\
+\n\
+    note: /^(?:\\[{2}(?!\\[+))(.+)(?:\\]{2}(?!\\[+))$/,\n\
+    note_inline: /(?:\\[{2}(?!\\[+))([\\s\\S]+?)(?:\\]{2}(?!\\[+))/g,\n\
+    boneyard: /(^\\/\\*|^\\*\\/)$/g,\n\
+\n\
+    page_break: /^\\={3,}$/,\n\
+    line_break: /^ {2}$/,\n\
+\n\
+    emphasis: /(_|\\*{1,3}|_\\*{1,3}|\\*{1,3}_)(.+)(_|\\*{1,3}|_\\*{1,3}|\\*{1,3}_)/g,\n\
+    bold_italic_underline: /(_{1}\\*{3}(?=.+\\*{3}_{1})|\\*{3}_{1}(?=.+_{1}\\*{3}))(.+?)(\\*{3}_{1}|_{1}\\*{3})/g,\n\
+    bold_underline: /(_{1}\\*{2}(?=.+\\*{2}_{1})|\\*{2}_{1}(?=.+_{1}\\*{2}))(.+?)(\\*{2}_{1}|_{1}\\*{2})/g,\n\
+    italic_underline: /(?:_{1}\\*{1}(?=.+\\*{1}_{1})|\\*{1}_{1}(?=.+_{1}\\*{1}))(.+?)(\\*{1}_{1}|_{1}\\*{1})/g,\n\
+    bold_italic: /(\\*{3}(?=.+\\*{3}))(.+?)(\\*{3})/g,\n\
+    bold: /(\\*{2}(?=.+\\*{2}))(.+?)(\\*{2})/g,\n\
+    italic: /(\\*{1}(?=.+\\*{1}))(.+?)(\\*{1})/g,\n\
+    underline: /(_{1}(?=.+_{1}))(.+?)(_{1})/g,\n\
+\n\
+    splitter: /\\n\
+{2,}/g,\n\
+    cleaner: /^\\n\
++|\\n\
++$/,\n\
+    standardizer: /\\r\\n\
+|\\r/g,\n\
+    whitespacer: /^\\t+|^ {3,}/gm\n\
+  };\n\
+\n\
+  var lexer = function (script) {\n\
+    return script.replace(regex.boneyard, '\\n\
+$1\\n\
+')\n\
+                 .replace(regex.standardizer, '\\n\
+')\n\
+                 .replace(regex.cleaner, '')\n\
+                 .replace(regex.whitespacer, '');\n\
+  };\n\
+     \n\
+  var tokenize = function (script) {\n\
+    var src    = lexer(script).split(regex.splitter)\n\
+      , i      = src.length, line, match, parts, text, meta, x, xlen, dual\n\
+      , tokens = [];\n\
+\n\
+    while (i--) {\n\
+      line = src[i];\n\
+      \n\
+      // title page\n\
+      if (regex.title_page.test(line)) {\n\
+        match = line.replace(regex.title_page, '\\n\
+$1').split(regex.splitter).reverse();\n\
+        for (x = 0, xlen = match.length; x < xlen; x++) {\n\
+          parts = match[x].replace(regex.cleaner, '').split(/\\:\\n\
+*/);\n\
+          tokens.push({ type: parts[0].trim().toLowerCase().replace(' ', '_'), text: parts[1].trim() });\n\
+        }\n\
+        continue;\n\
+      }\n\
+\n\
+      // scene headings\n\
+      if (match = line.match(regex.scene_heading)) {\n\
+        text = match[1] || match[2];\n\
+\n\
+        if (text.indexOf('  ') !== text.length - 2) {\n\
+          if (meta = text.match(regex.scene_number)) {\n\
+            meta = meta[2];\n\
+            text = text.replace(regex.scene_number, '');\n\
+          }\n\
+          tokens.push({ type: 'scene_heading', text: text, scene_number: meta || undefined });\n\
+        }\n\
+        continue;\n\
+      }\n\
+\n\
+      // centered\n\
+      if (match = line.match(regex.centered)) {\n\
+        tokens.push({ type: 'centered', text: match[0].replace(/>|</g, '') });\n\
+        continue;\n\
+      }\n\
+\n\
+      // transitions\n\
+      if (match = line.match(regex.transition)) {\n\
+        tokens.push({ type: 'transition', text: match[1] || match[2] });\n\
+        continue;\n\
+      }\n\
+    \n\
+      // dialogue blocks - characters, parentheticals and dialogue\n\
+      if (match = line.match(regex.dialogue)) {\n\
+        if (match[1].indexOf('  ') !== match[1].length - 2) {\n\
+          // we're iterating from the bottom up, so we need to push these backwards\n\
+          if (match[2]) {\n\
+            tokens.push({ type: 'dual_dialogue_end' });\n\
+          }\n\
+\n\
+          tokens.push({ type: 'dialogue_end' });\n\
+\n\
+          parts = match[3].split(/(\\(.+\\))(?:\\n\
++)/).reverse();\n\
+\n\
+          for (x = 0, xlen = parts.length; x < xlen; x++) {\t\n\
+            text = parts[x];\n\
+\n\
+            if (text.length > 0) {\n\
+              tokens.push({ type: regex.parenthetical.test(text) ? 'parenthetical' : 'dialogue', text: text });\n\
+            }\n\
+          }\n\
+\n\
+          tokens.push({ type: 'character', text: match[1].trim() });\n\
+          tokens.push({ type: 'dialogue_begin', dual: match[2] ? 'right' : dual ? 'left' : undefined });\n\
+\n\
+          if (dual) {\n\
+            tokens.push({ type: 'dual_dialogue_begin' });\n\
+          }\n\
+\n\
+          dual = match[2] ? true : false;\n\
+          continue;\n\
+        }\n\
+      }\n\
+      \n\
+      // section\n\
+      if (match = line.match(regex.section)) {\n\
+        tokens.push({ type: 'section', text: match[2], depth: match[1].length });\n\
+        continue;\n\
+      }\n\
+      \n\
+      // synopsis\n\
+      if (match = line.match(regex.synopsis)) {\n\
+        tokens.push({ type: 'synopsis', text: match[1] });\n\
+        continue;\n\
+      }\n\
+\n\
+      // notes\n\
+      if (match = line.match(regex.note)) {\n\
+        tokens.push({ type: 'note', text: match[1]});\n\
+        continue;\n\
+      }      \n\
+\n\
+      // boneyard\n\
+      if (match = line.match(regex.boneyard)) {\n\
+        tokens.push({ type: match[0][0] === '/' ? 'boneyard_begin' : 'boneyard_end' });\n\
+        continue;\n\
+      }      \n\
+\n\
+      // page breaks\n\
+      if (regex.page_break.test(line)) {\n\
+        tokens.push({ type: 'page_break' });\n\
+        continue;\n\
+      }\n\
+      \n\
+      // line breaks\n\
+      if (regex.line_break.test(line)) {\n\
+        tokens.push({ type: 'line_break' });\n\
+        continue;\n\
+      }\n\
+\n\
+      tokens.push({ type: 'action', text: line });\n\
+    }\n\
+\n\
+    return tokens;\n\
+  };\n\
+\n\
+  var inline = {\n\
+    note: '<!-- $1 -->',\n\
+\n\
+    line_break: '<br />',\n\
+\n\
+    bold_italic_underline: '<span class=\\\"bold italic underline\\\">$2</span>',\n\
+    bold_underline: '<span class=\\\"bold underline\\\">$2</span>',\n\
+    italic_underline: '<span class=\\\"italic underline\\\">$2</span>',\n\
+    bold_italic: '<span class=\\\"bold italic\\\">$2</span>',\n\
+    bold: '<span class=\\\"bold\\\">$2</span>',\n\
+    italic: '<span class=\\\"italic\\\">$2</span>',\n\
+    underline: '<span class=\\\"underline\\\">$2</span>'\n\
+  };\n\
+\n\
+  inline.lexer = function (s) {\n\
+    if (!s) {\n\
+      return;\n\
+    }  \n\
+\n\
+    var styles = [ 'underline', 'italic', 'bold', 'bold_italic', 'italic_underline', 'bold_underline', 'bold_italic_underline' ]\n\
+           , i = styles.length, style, match;\n\
+\n\
+    s = s.replace(regex.note_inline, inline.note).replace(/\\\\\\*/g, '[star]').replace(/\\\\_/g, '[underline]').replace(/\\n\
+/g, inline.line_break);\n\
+\n\
+   // if (regex.emphasis.test(s)) {                         // this was causing only every other occurence of an emphasis syntax to be parsed\n\
+      while (i--) {\n\
+        style = styles[i];\n\
+        match = regex[style];\n\
+   \n\
+        if (match.test(s)) {\n\
+          s = s.replace(match, inline[style]);\n\
+        }\n\
+      }\n\
+   // }\n\
+\n\
+    return s.replace(/\\[star\\]/g, '*').replace(/\\[underline\\]/g, '_').trim();\n\
+  };\n\
+\n\
+  var parse = function (script, toks, callback) {\n\
+    if (callback === undefined && typeof toks === 'function') {\n\
+      callback = toks;\n\
+      toks = undefined;\n\
+    }\n\
+      \n\
+    var tokens = tokenize(script)\n\
+      , i      = tokens.length, token\n\
+      , title, title_page = [], html = [], output;\n\
+\n\
+    while (i--) {\n\
+      token = tokens[i];\n\
+      token.text = inline.lexer(token.text);\n\
+\n\
+      switch (token.type) {\n\
+        case 'title': title_page.push('<h1>' + token.text + '</h1>'); title = token.text.replace('<br />', ' ').replace(/<(?:.|\\n\
+)*?>/g, ''); break;\n\
+        case 'credit': title_page.push('<p class=\\\"credit\\\">' + token.text + '</p>'); break;\n\
+        case 'author': title_page.push('<p class=\\\"authors\\\">' + token.text + '</p>'); break;\n\
+        case 'authors': title_page.push('<p class=\\\"authors\\\">' + token.text + '</p>'); break;\n\
+        case 'source': title_page.push('<p class=\\\"source\\\">' + token.text + '</p>'); break;\n\
+        case 'notes': title_page.push('<p class=\\\"notes\\\">' + token.text + '</p>'); break;\n\
+        case 'draft_date': title_page.push('<p class=\\\"draft-date\\\">' + token.text + '</p>'); break;\n\
+        case 'date': title_page.push('<p class=\\\"date\\\">' + token.text + '</p>'); break;\n\
+        case 'contact': title_page.push('<p class=\\\"contact\\\">' + token.text + '</p>'); break;\n\
+        case 'copyright': title_page.push('<p class=\\\"copyright\\\">' + token.text + '</p>'); break;\n\
+\n\
+        case 'scene_heading': html.push('<h3' + (token.scene_number ? ' id=\\\"' + token.scene_number + '\\\">' : '>') + token.text + '</h3>'); break;\n\
+        case 'transition': html.push('<h2>' + token.text + '</h2>'); break;\n\
+\n\
+        case 'dual_dialogue_begin': html.push('<div class=\\\"dual-dialogue\\\">'); break;\n\
+        case 'dialogue_begin': html.push('<div class=\\\"dialogue' + (token.dual ? ' ' + token.dual : '') + '\\\">'); break;\n\
+        case 'character': html.push('<h4>' + token.text + '</h4>'); break;\n\
+        case 'parenthetical': html.push('<p class=\\\"parenthetical\\\">' + token.text + '</p>'); break;\n\
+        case 'dialogue': html.push('<p>' + token.text + '</p>'); break;\n\
+        case 'dialogue_end': html.push('</div> '); break;\n\
+        case 'dual_dialogue_end': html.push('</div> '); break;\n\
+\n\
+        case 'section': html.push('<p class=\\\"section\\\" data-depth=\\\"' + token.depth + '\\\">' + token.text + '</p>'); break;\n\
+        case 'synopsis': html.push('<p class=\\\"synopsis\\\">' + token.text + '</p>'); break;\n\
+\n\
+        case 'note': html.push('<!-- ' + token.text + '-->'); break;\n\
+        case 'boneyard_begin': html.push('<!-- '); break;\n\
+        case 'boneyard_end': html.push(' -->'); break;\n\
+\n\
+        case 'action': html.push('<p>' + token.text + '</p>'); break;\n\
+        case 'centered': html.push('<p class=\\\"centered\\\">' + token.text + '</p>'); break;\n\
+        \n\
+        case 'page_break': html.push('<hr />'); break;\n\
+        case 'line_break': html.push('<br />'); break;\n\
+      }\n\
+    }\n\
+\n\
+    output = { title: title, html: { title_page: title_page.join(''), script: html.join('') }, tokens: toks ? tokens.reverse() : undefined };\n\
+\n\
+    if (typeof callback === 'function') {\n\
+      return callback(output);\n\
+    }\n\
+\n\
+    return output;\n\
+  };\n\
+\n\
+  var fountain = function (script, callback) {\n\
+    return fountain.parse(script, callback);\n\
+  };\n\
+    \n\
+  fountain.parse = function (script, tokens, callback) {\n\
+    return parse(script, tokens, callback);\n\
+  };\n\
+\n\
+  if (typeof module !== 'undefined') {\n\
+    module.exports = fountain;\n\
+  } else {\n\
+    this.fountain = fountain;\n\
+  }  \n\
+}).call(this);\n\
+//@ sourceURL=whyohwhyamihere-fountain/index.js"
+));
+require.register("yields-isArray/index.js", Function("exports, require, module",
+"\n\
+/**\n\
+ * isArray\n\
+ */\n\
+\n\
+var isArray = Array.isArray;\n\
+\n\
+/**\n\
+ * toString\n\
+ */\n\
+\n\
+var str = Object.prototype.toString;\n\
+\n\
+/**\n\
+ * Whether or not the given `val`\n\
+ * is an array.\n\
+ *\n\
+ * example:\n\
+ *\n\
+ *        isArray([]);\n\
+ *        // > true\n\
+ *        isArray(arguments);\n\
+ *        // > false\n\
+ *        isArray('');\n\
+ *        // > false\n\
+ *\n\
+ * @param {mixed} val\n\
+ * @return {bool}\n\
+ */\n\
+\n\
+module.exports = isArray || function (val) {\n\
+  return !! val && '[object Array]' == str.call(val);\n\
+};\n\
+//@ sourceURL=yields-isArray/index.js"
+));
+require.register("whyohwhyamihere-post/index.js", Function("exports, require, module",
+"var dom = require('dom'),\n\
+    isArray = require('isArray');\n\
+\n\
+module.exports = function(url, data, method) {\n\
+    if (method == null)\n\
+        method = 'POST';\n\
+    if (data == null)\n\
+        data = {};\n\
+\n\
+    var form = document.createElement('form');\n\
+    dom(form)\n\
+        .attr('method', method)\n\
+        .attr('action', url);\n\
+    dom(form).css('display', 'none');\n\
+\n\
+    var addData = function(name, data) {\n\
+        if (isArray(data)) {\n\
+            for (var i = 0; i < data.length; i++) {\n\
+                var value = data[i];\n\
+                addData(name + '[]', value);\n\
+            }\n\
+        } else if (typeof data === 'object') {\n\
+            for (var key in data) {\n\
+                if (data.hasOwnProperty(key)) {\n\
+                    addData(name + '[' + key + ']', data[key]);\n\
+                }\n\
+            }\n\
+        } else if (data != null) {\n\
+            var input = document.createElement('input');\n\
+            dom(input)\n\
+              .attr('type', 'hidden')\n\
+              .attr('name', String(name))\n\
+              .attr('value', String(data));\n\
+            dom(form).append(dom(input));\n\
+        }\n\
+    };\n\
+\n\
+    for (var key in data) {\n\
+        if (data.hasOwnProperty(key)) {\n\
+            addData(key, data[key]);\n\
+        }\n\
+    }\n\
+    \n\
+    form.submit();\n\
+}//@ sourceURL=whyohwhyamihere-post/index.js"
+));
+require.register("component-debounce/index.js", Function("exports, require, module",
+"/**\n\
+ * Debounces a function by the given threshold.\n\
+ *\n\
+ * @see http://unscriptable.com/2009/03/20/debouncing-javascript-methods/\n\
+ * @param {Function} function to wrap\n\
+ * @param {Number} timeout in ms (`100`)\n\
+ * @param {Boolean} whether to execute at the beginning (`false`)\n\
+ * @api public\n\
+ */\n\
+\n\
+module.exports = function debounce(func, threshold, execAsap){\n\
+  var timeout;\n\
+\n\
+  return function debounced(){\n\
+    var obj = this, args = arguments;\n\
+\n\
+    function delayed () {\n\
+      if (!execAsap) {\n\
+        func.apply(obj, args);\n\
+      }\n\
+      timeout = null;\n\
+    }\n\
+\n\
+    if (timeout) {\n\
+      clearTimeout(timeout);\n\
+    } else if (execAsap) {\n\
+      func.apply(obj, args);\n\
+    }\n\
+\n\
+    timeout = setTimeout(delayed, threshold || 100);\n\
+  };\n\
+};\n\
+//@ sourceURL=component-debounce/index.js"
+));
+require.register("component-bind/index.js", Function("exports, require, module",
+"\n\
+/**\n\
+ * Slice reference.\n\
+ */\n\
+\n\
+var slice = [].slice;\n\
+\n\
+/**\n\
+ * Bind `obj` to `fn`.\n\
+ *\n\
+ * @param {Object} obj\n\
+ * @param {Function|String} fn or string\n\
+ * @return {Function}\n\
+ * @api public\n\
+ */\n\
+\n\
+module.exports = function(obj, fn){\n\
+  if ('string' == typeof fn) fn = obj[fn];\n\
+  if ('function' != typeof fn) throw new Error('bind() requires a function');\n\
+  var args = [].slice.call(arguments, 2);\n\
+  return function(){\n\
+    return fn.apply(obj, args.concat(slice.call(arguments)));\n\
+  }\n\
+};\n\
+//@ sourceURL=component-bind/index.js"
+));
+require.register("component-type/index.js", Function("exports, require, module",
+"\n\
+/**\n\
+ * toString ref.\n\
+ */\n\
+\n\
+var toString = Object.prototype.toString;\n\
+\n\
+/**\n\
+ * Return the type of `val`.\n\
+ *\n\
+ * @param {Mixed} val\n\
+ * @return {String}\n\
+ * @api public\n\
+ */\n\
+\n\
+module.exports = function(val){\n\
+  switch (toString.call(val)) {\n\
+    case '[object Function]': return 'function';\n\
+    case '[object Date]': return 'date';\n\
+    case '[object RegExp]': return 'regexp';\n\
+    case '[object Arguments]': return 'arguments';\n\
+    case '[object Array]': return 'array';\n\
+    case '[object String]': return 'string';\n\
+  }\n\
+\n\
+  if (val === null) return 'null';\n\
+  if (val === undefined) return 'undefined';\n\
+  if (val && val.nodeType === 1) return 'element';\n\
+  if (val === Object(val)) return 'object';\n\
+\n\
+  return typeof val;\n\
+};\n\
+//@ sourceURL=component-type/index.js"
+));
+require.register("component-event/index.js", Function("exports, require, module",
+"\n\
+/**\n\
+ * Bind `el` event `type` to `fn`.\n\
+ *\n\
+ * @param {Element} el\n\
+ * @param {String} type\n\
+ * @param {Function} fn\n\
+ * @param {Boolean} capture\n\
+ * @return {Function}\n\
+ * @api public\n\
+ */\n\
+\n\
+exports.bind = function(el, type, fn, capture){\n\
+  if (el.addEventListener) {\n\
+    el.addEventListener(type, fn, capture || false);\n\
+  } else {\n\
+    el.attachEvent('on' + type, fn);\n\
+  }\n\
+  return fn;\n\
+};\n\
+\n\
+/**\n\
+ * Unbind `el` event `type`'s callback `fn`.\n\
+ *\n\
+ * @param {Element} el\n\
+ * @param {String} type\n\
+ * @param {Function} fn\n\
+ * @param {Boolean} capture\n\
+ * @return {Function}\n\
+ * @api public\n\
+ */\n\
+\n\
+exports.unbind = function(el, type, fn, capture){\n\
+  if (el.removeEventListener) {\n\
+    el.removeEventListener(type, fn, capture || false);\n\
+  } else {\n\
+    el.detachEvent('on' + type, fn);\n\
+  }\n\
+  return fn;\n\
+};\n\
+//@ sourceURL=component-event/index.js"
+));
+require.register("component-delegate/index.js", Function("exports, require, module",
+"\n\
+/**\n\
+ * Module dependencies.\n\
+ */\n\
+\n\
+var matches = require('matches-selector')\n\
+  , event = require('event');\n\
+\n\
+/**\n\
+ * Delegate event `type` to `selector`\n\
+ * and invoke `fn(e)`. A callback function\n\
+ * is returned which may be passed to `.unbind()`.\n\
+ *\n\
+ * @param {Element} el\n\
+ * @param {String} selector\n\
+ * @param {String} type\n\
+ * @param {Function} fn\n\
+ * @param {Boolean} capture\n\
+ * @return {Function}\n\
+ * @api public\n\
+ */\n\
+\n\
+exports.bind = function(el, selector, type, fn, capture){\n\
+  return event.bind(el, type, function(e){\n\
+    if (matches(e.target, selector)) fn(e);\n\
+  }, capture);\n\
+  return callback;\n\
+};\n\
+\n\
+/**\n\
+ * Unbind event `type`'s callback `fn`.\n\
+ *\n\
+ * @param {Element} el\n\
+ * @param {String} type\n\
+ * @param {Function} fn\n\
+ * @param {Boolean} capture\n\
+ * @api public\n\
+ */\n\
+\n\
+exports.unbind = function(el, type, fn, capture){\n\
+  event.unbind(el, type, fn, capture);\n\
+};\n\
+//@ sourceURL=component-delegate/index.js"
+));
+require.register("component-indexof/index.js", Function("exports, require, module",
+"\n\
+var indexOf = [].indexOf;\n\
+\n\
+module.exports = function(arr, obj){\n\
+  if (indexOf) return arr.indexOf(obj);\n\
+  for (var i = 0; i < arr.length; ++i) {\n\
+    if (arr[i] === obj) return i;\n\
+  }\n\
+  return -1;\n\
+};//@ sourceURL=component-indexof/index.js"
+));
+require.register("component-domify/index.js", Function("exports, require, module",
+"\n\
+/**\n\
+ * Expose `parse`.\n\
+ */\n\
+\n\
+module.exports = parse;\n\
+\n\
+/**\n\
+ * Wrap map from jquery.\n\
+ */\n\
+\n\
+var map = {\n\
+  option: [1, '<select multiple=\"multiple\">', '</select>'],\n\
+  optgroup: [1, '<select multiple=\"multiple\">', '</select>'],\n\
+  legend: [1, '<fieldset>', '</fieldset>'],\n\
+  thead: [1, '<table>', '</table>'],\n\
+  tbody: [1, '<table>', '</table>'],\n\
+  tfoot: [1, '<table>', '</table>'],\n\
+  colgroup: [1, '<table>', '</table>'],\n\
+  caption: [1, '<table>', '</table>'],\n\
+  tr: [2, '<table><tbody>', '</tbody></table>'],\n\
+  td: [3, '<table><tbody><tr>', '</tr></tbody></table>'],\n\
+  th: [3, '<table><tbody><tr>', '</tr></tbody></table>'],\n\
+  col: [2, '<table><tbody></tbody><colgroup>', '</colgroup></table>'],\n\
+  _default: [0, '', '']\n\
+};\n\
+\n\
+/**\n\
+ * Parse `html` and return the children.\n\
+ *\n\
+ * @param {String} html\n\
+ * @return {Array}\n\
+ * @api private\n\
+ */\n\
+\n\
+function parse(html) {\n\
+  if ('string' != typeof html) throw new TypeError('String expected');\n\
+\n\
+  // tag name\n\
+  var m = /<([\\w:]+)/.exec(html);\n\
+  if (!m) throw new Error('No elements were generated.');\n\
+  var tag = m[1];\n\
+\n\
+  // body support\n\
+  if (tag == 'body') {\n\
+    var el = document.createElement('html');\n\
+    el.innerHTML = html;\n\
+    return el.removeChild(el.lastChild);\n\
+  }\n\
+\n\
+  // wrap map\n\
+  var wrap = map[tag] || map._default;\n\
+  var depth = wrap[0];\n\
+  var prefix = wrap[1];\n\
+  var suffix = wrap[2];\n\
+  var el = document.createElement('div');\n\
+  el.innerHTML = prefix + html + suffix;\n\
+  while (depth--) el = el.lastChild;\n\
+\n\
+  var els = el.children;\n\
+  if (1 == els.length) {\n\
+    return el.removeChild(els[0]);\n\
+  }\n\
+\n\
+  var fragment = document.createDocumentFragment();\n\
+  while (els.length) {\n\
+    fragment.appendChild(el.removeChild(els[0]));\n\
+  }\n\
+\n\
+  return fragment;\n\
+}\n\
+//@ sourceURL=component-domify/index.js"
+));
+require.register("component-classes/index.js", Function("exports, require, module",
+"\n\
+/**\n\
+ * Module dependencies.\n\
+ */\n\
+\n\
+var index = require('indexof');\n\
+\n\
+/**\n\
+ * Whitespace regexp.\n\
+ */\n\
+\n\
+var re = /\\s+/;\n\
+\n\
+/**\n\
+ * toString reference.\n\
+ */\n\
+\n\
+var toString = Object.prototype.toString;\n\
+\n\
+/**\n\
+ * Wrap `el` in a `ClassList`.\n\
+ *\n\
+ * @param {Element} el\n\
+ * @return {ClassList}\n\
+ * @api public\n\
+ */\n\
+\n\
+module.exports = function(el){\n\
+  return new ClassList(el);\n\
+};\n\
+\n\
+/**\n\
+ * Initialize a new ClassList for `el`.\n\
+ *\n\
+ * @param {Element} el\n\
+ * @api private\n\
+ */\n\
+\n\
+function ClassList(el) {\n\
+  this.el = el;\n\
+  this.list = el.classList;\n\
+}\n\
+\n\
+/**\n\
+ * Add class `name` if not already present.\n\
+ *\n\
+ * @param {String} name\n\
+ * @return {ClassList}\n\
+ * @api public\n\
+ */\n\
+\n\
+ClassList.prototype.add = function(name){\n\
+  // classList\n\
+  if (this.list) {\n\
+    this.list.add(name);\n\
+    return this;\n\
+  }\n\
+\n\
+  // fallback\n\
+  var arr = this.array();\n\
+  var i = index(arr, name);\n\
+  if (!~i) arr.push(name);\n\
+  this.el.className = arr.join(' ');\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Remove class `name` when present, or\n\
+ * pass a regular expression to remove\n\
+ * any which match.\n\
+ *\n\
+ * @param {String|RegExp} name\n\
+ * @return {ClassList}\n\
+ * @api public\n\
+ */\n\
+\n\
+ClassList.prototype.remove = function(name){\n\
+  if ('[object RegExp]' == toString.call(name)) {\n\
+    return this.removeMatching(name);\n\
+  }\n\
+\n\
+  // classList\n\
+  if (this.list) {\n\
+    this.list.remove(name);\n\
+    return this;\n\
+  }\n\
+\n\
+  // fallback\n\
+  var arr = this.array();\n\
+  var i = index(arr, name);\n\
+  if (~i) arr.splice(i, 1);\n\
+  this.el.className = arr.join(' ');\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Remove all classes matching `re`.\n\
+ *\n\
+ * @param {RegExp} re\n\
+ * @return {ClassList}\n\
+ * @api private\n\
+ */\n\
+\n\
+ClassList.prototype.removeMatching = function(re){\n\
+  var arr = this.array();\n\
+  for (var i = 0; i < arr.length; i++) {\n\
+    if (re.test(arr[i])) {\n\
+      this.remove(arr[i]);\n\
+    }\n\
+  }\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Toggle class `name`.\n\
+ *\n\
+ * @param {String} name\n\
+ * @return {ClassList}\n\
+ * @api public\n\
+ */\n\
+\n\
+ClassList.prototype.toggle = function(name){\n\
+  // classList\n\
+  if (this.list) {\n\
+    this.list.toggle(name);\n\
+    return this;\n\
+  }\n\
+\n\
+  // fallback\n\
+  if (this.has(name)) {\n\
+    this.remove(name);\n\
+  } else {\n\
+    this.add(name);\n\
+  }\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Return an array of classes.\n\
+ *\n\
+ * @return {Array}\n\
+ * @api public\n\
+ */\n\
+\n\
+ClassList.prototype.array = function(){\n\
+  var str = this.el.className.replace(/^\\s+|\\s+$/g, '');\n\
+  var arr = str.split(re);\n\
+  if ('' === arr[0]) arr.shift();\n\
+  return arr;\n\
+};\n\
+\n\
+/**\n\
+ * Check if class `name` is present.\n\
+ *\n\
+ * @param {String} name\n\
+ * @return {ClassList}\n\
+ * @api public\n\
+ */\n\
+\n\
+ClassList.prototype.has =\n\
+ClassList.prototype.contains = function(name){\n\
+  return this.list\n\
+    ? this.list.contains(name)\n\
+    : !! ~index(this.array(), name);\n\
+};\n\
+//@ sourceURL=component-classes/index.js"
+));
+require.register("component-css/index.js", Function("exports, require, module",
+"\n\
+/**\n\
+ * Properties to ignore appending \"px\".\n\
+ */\n\
+\n\
+var ignore = {\n\
+  columnCount: true,\n\
+  fillOpacity: true,\n\
+  fontWeight: true,\n\
+  lineHeight: true,\n\
+  opacity: true,\n\
+  orphans: true,\n\
+  widows: true,\n\
+  zIndex: true,\n\
+  zoom: true\n\
+};\n\
+\n\
+/**\n\
+ * Set `el` css values.\n\
+ *\n\
+ * @param {Element} el\n\
+ * @param {Object} obj\n\
+ * @return {Element}\n\
+ * @api public\n\
+ */\n\
+\n\
+module.exports = function(el, obj){\n\
+  for (var key in obj) {\n\
+    var val = obj[key];\n\
+    if ('number' == typeof val && !ignore[key]) val += 'px';\n\
+    el.style[key] = val;\n\
+  }\n\
+  return el;\n\
+};\n\
+//@ sourceURL=component-css/index.js"
+));
+require.register("component-sort/index.js", Function("exports, require, module",
+"\n\
+/**\n\
+ * Expose `sort`.\n\
+ */\n\
+\n\
+exports = module.exports = sort;\n\
+\n\
+/**\n\
+ * Sort `el`'s children with the given `fn(a, b)`.\n\
+ *\n\
+ * @param {Element} el\n\
+ * @param {Function} fn\n\
+ * @api public\n\
+ */\n\
+\n\
+function sort(el, fn) {\n\
+  var arr = [].slice.call(el.children).sort(fn);\n\
+  var frag = document.createDocumentFragment();\n\
+  for (var i = 0; i < arr.length; i++) {\n\
+    frag.appendChild(arr[i]);\n\
+  }\n\
+  el.appendChild(frag);\n\
+};\n\
+\n\
+/**\n\
+ * Sort descending.\n\
+ *\n\
+ * @param {Element} el\n\
+ * @param {Function} fn\n\
+ * @api public\n\
+ */\n\
+\n\
+exports.desc = function(el, fn){\n\
+  sort(el, function(a, b){\n\
+    return ~fn(a, b) + 1;\n\
+  });\n\
+};\n\
+\n\
+/**\n\
+ * Sort ascending.\n\
+ */\n\
+\n\
+exports.asc = sort;\n\
+//@ sourceURL=component-sort/index.js"
+));
+require.register("component-value/index.js", Function("exports, require, module",
+"\n\
+/**\n\
+ * Module dependencies.\n\
+ */\n\
+\n\
+var typeOf = require('type');\n\
+\n\
+/**\n\
+ * Set or get `el`'s' value.\n\
+ *\n\
+ * @param {Element} el\n\
+ * @param {Mixed} val\n\
+ * @return {Mixed}\n\
+ * @api public\n\
+ */\n\
+\n\
+module.exports = function(el, val){\n\
+  if (2 == arguments.length) return set(el, val);\n\
+  return get(el);\n\
+};\n\
+\n\
+/**\n\
+ * Get `el`'s value.\n\
+ */\n\
+\n\
+function get(el) {\n\
+  switch (type(el)) {\n\
+    case 'checkbox':\n\
+    case 'radio':\n\
+      if (el.checked) {\n\
+        var attr = el.getAttribute('value');\n\
+        return null == attr ? true : attr;\n\
+      } else {\n\
+        return false;\n\
+      }\n\
+    case 'radiogroup':\n\
+      for (var i = 0, radio; radio = el[i]; i++) {\n\
+        if (radio.checked) return radio.value;\n\
+      }\n\
+      break;\n\
+    case 'select':\n\
+      for (var i = 0, option; option = el.options[i]; i++) {\n\
+        if (option.selected) return option.value;\n\
+      }\n\
+      break;\n\
+    default:\n\
+      return el.value;\n\
+  }\n\
+}\n\
+\n\
+/**\n\
+ * Set `el`'s value.\n\
+ */\n\
+\n\
+function set(el, val) {\n\
+  switch (type(el)) {\n\
+    case 'checkbox':\n\
+    case 'radio':\n\
+      if (val) {\n\
+        el.checked = true;\n\
+      } else {\n\
+        el.checked = false;\n\
+      }\n\
+      break;\n\
+    case 'radiogroup':\n\
+      for (var i = 0, radio; radio = el[i]; i++) {\n\
+        radio.checked = radio.value === val;\n\
+      }\n\
+      break;\n\
+    case 'select':\n\
+      for (var i = 0, option; option = el.options[i]; i++) {\n\
+        option.selected = option.value === val;\n\
+      }\n\
+      break;\n\
+    default:\n\
+      el.value = val;\n\
+  }\n\
+}\n\
+\n\
+/**\n\
+ * Element type.\n\
+ */\n\
+\n\
+function type(el) {\n\
+  var group = 'array' == typeOf(el) || 'object' == typeOf(el);\n\
+  if (group) el = el[0];\n\
+  var name = el.nodeName.toLowerCase();\n\
+  var type = el.getAttribute('type');\n\
+\n\
+  if (group && type && 'radio' == type.toLowerCase()) return 'radiogroup';\n\
+  if ('input' == name && type && 'checkbox' == type.toLowerCase()) return 'checkbox';\n\
+  if ('input' == name && type && 'radio' == type.toLowerCase()) return 'radio';\n\
+  if ('select' == name) return 'select';\n\
+  return name;\n\
+}\n\
+//@ sourceURL=component-value/index.js"
+));
+require.register("component-query/index.js", Function("exports, require, module",
+"\n\
+function one(selector, el) {\n\
+  return el.querySelector(selector);\n\
+}\n\
+\n\
+exports = module.exports = function(selector, el){\n\
+  el = el || document;\n\
+  return one(selector, el);\n\
+};\n\
+\n\
+exports.all = function(selector, el){\n\
+  el = el || document;\n\
+  return el.querySelectorAll(selector);\n\
+};\n\
+\n\
+exports.engine = function(obj){\n\
+  if (!obj.one) throw new Error('.one callback required');\n\
+  if (!obj.all) throw new Error('.all callback required');\n\
+  one = obj.one;\n\
+  exports.all = obj.all;\n\
+};\n\
+//@ sourceURL=component-query/index.js"
+));
+require.register("component-matches-selector/index.js", Function("exports, require, module",
+"/**\n\
+ * Module dependencies.\n\
+ */\n\
+\n\
+var query = require('query');\n\
+\n\
+/**\n\
+ * Element prototype.\n\
+ */\n\
+\n\
+var proto = Element.prototype;\n\
+\n\
+/**\n\
+ * Vendor function.\n\
+ */\n\
+\n\
+var vendor = proto.matches\n\
+  || proto.webkitMatchesSelector\n\
+  || proto.mozMatchesSelector\n\
+  || proto.msMatchesSelector\n\
+  || proto.oMatchesSelector;\n\
+\n\
+/**\n\
+ * Expose `match()`.\n\
+ */\n\
+\n\
+module.exports = match;\n\
+\n\
+/**\n\
+ * Match `el` to `selector`.\n\
+ *\n\
+ * @param {Element} el\n\
+ * @param {String} selector\n\
+ * @return {Boolean}\n\
+ * @api public\n\
+ */\n\
+\n\
+function match(el, selector) {\n\
+  if (vendor) return vendor.call(el, selector);\n\
+  var nodes = query.all(selector, el.parentNode);\n\
+  for (var i = 0; i < nodes.length; ++i) {\n\
+    if (nodes[i] == el) return true;\n\
+  }\n\
+  return false;\n\
+}\n\
+//@ sourceURL=component-matches-selector/index.js"
+));
+require.register("yields-traverse/index.js", Function("exports, require, module",
+"\n\
+/**\n\
+ * dependencies\n\
+ */\n\
+\n\
+var matches = require('matches-selector');\n\
+\n\
+/**\n\
+ * Traverse with the given `el`, `selector` and `len`.\n\
+ *\n\
+ * @param {String} type\n\
+ * @param {Element} el\n\
+ * @param {String} selector\n\
+ * @param {Number} len\n\
+ * @return {Array}\n\
+ * @api public\n\
+ */\n\
+\n\
+module.exports = function(type, el, selector, len){\n\
+  var el = el[type]\n\
+    , n = len || 1\n\
+    , ret = [];\n\
+\n\
+  if (!el) return ret;\n\
+\n\
+  do {\n\
+    if (n == ret.length) break;\n\
+    if (1 != el.nodeType) continue;\n\
+    if (matches(el, selector)) ret.push(el);\n\
+    if (!selector) ret.push(el);\n\
+  } while (el = el[type]);\n\
+\n\
+  return ret;\n\
+}\n\
+//@ sourceURL=yields-traverse/index.js"
+));
+require.register("component-trim/index.js", Function("exports, require, module",
+"\n\
+exports = module.exports = trim;\n\
+\n\
+function trim(str){\n\
+  if (str.trim) return str.trim();\n\
+  return str.replace(/^\\s*|\\s*$/g, '');\n\
+}\n\
+\n\
+exports.left = function(str){\n\
+  if (str.trimLeft) return str.trimLeft();\n\
+  return str.replace(/^\\s*/, '');\n\
+};\n\
+\n\
+exports.right = function(str){\n\
+  if (str.trimRight) return str.trimRight();\n\
+  return str.replace(/\\s*$/, '');\n\
+};\n\
+//@ sourceURL=component-trim/index.js"
+));
+require.register("component-dom/index.js", Function("exports, require, module",
+"/**\n\
+ * Module dependencies.\n\
+ */\n\
+\n\
+var matches = require('matches-selector');\n\
+var delegate = require('delegate');\n\
+var classes = require('classes');\n\
+var traverse = require('traverse');\n\
+var indexof = require('indexof');\n\
+var domify = require('domify');\n\
+var events = require('event');\n\
+var value = require('value');\n\
+var query = require('query');\n\
+var type = require('type');\n\
+var trim = require('trim');\n\
+var css = require('css');\n\
+\n\
+/**\n\
+ * Attributes supported.\n\
+ */\n\
+\n\
+var attrs = [\n\
+  'id',\n\
+  'src',\n\
+  'rel',\n\
+  'cols',\n\
+  'rows',\n\
+  'type',\n\
+  'name',\n\
+  'href',\n\
+  'title',\n\
+  'style',\n\
+  'width',\n\
+  'height',\n\
+  'action',\n\
+  'method',\n\
+  'tabindex',\n\
+  'placeholder'\n\
+];\n\
+\n\
+/**\n\
+ * Expose `dom()`.\n\
+ */\n\
+\n\
+exports = module.exports = dom;\n\
+\n\
+/**\n\
+ * Expose supported attrs.\n\
+ */\n\
+\n\
+exports.attrs = attrs;\n\
+\n\
+/**\n\
+ * Return a dom `List` for the given\n\
+ * `html`, selector, or element.\n\
+ *\n\
+ * @param {String|Element|List}\n\
+ * @return {List}\n\
+ * @api public\n\
+ */\n\
+\n\
+function dom(selector, context) {\n\
+  // array\n\
+  if (Array.isArray(selector)) {\n\
+    return new List(selector);\n\
+  }\n\
+\n\
+  // List\n\
+  if (selector instanceof List) {\n\
+    return selector;\n\
+  }\n\
+\n\
+  // node\n\
+  if (selector.nodeName) {\n\
+    return new List([selector]);\n\
+  }\n\
+\n\
+  if ('string' != typeof selector) {\n\
+    throw new TypeError('invalid selector');\n\
+  }\n\
+\n\
+  // html\n\
+  var htmlselector = trim.left(selector);\n\
+  if ('<' == htmlselector.charAt(0)) {\n\
+    return new List([domify(htmlselector)], htmlselector);\n\
+  }\n\
+\n\
+  // selector\n\
+  var ctx = context\n\
+    ? (context.els ? context.els[0] : context)\n\
+    : document;\n\
+\n\
+  return new List(query.all(selector, ctx), selector);\n\
+}\n\
+\n\
+/**\n\
+ * Expose `List` constructor.\n\
+ */\n\
+\n\
+exports.List = List;\n\
+\n\
+/**\n\
+ * Initialize a new `List` with the\n\
+ * given array-ish of `els` and `selector`\n\
+ * string.\n\
+ *\n\
+ * @param {Mixed} els\n\
+ * @param {String} selector\n\
+ * @api private\n\
+ */\n\
+\n\
+function List(els, selector) {\n\
+  this.els = els || [];\n\
+  this.selector = selector;\n\
+}\n\
+\n\
+/**\n\
+ * Enumerable iterator.\n\
+ */\n\
+\n\
+List.prototype.__iterate__ = function(){\n\
+  var self = this;\n\
+  return {\n\
+    length: function(){ return self.els.length },\n\
+    get: function(i){ return new List([self.els[i]]) }\n\
+  }\n\
+};\n\
+\n\
+/**\n\
+ * Remove elements from the DOM.\n\
+ *\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.remove = function(){\n\
+  for (var i = 0; i < this.els.length; i++) {\n\
+    var el = this.els[i];\n\
+    var parent = el.parentNode;\n\
+    if (parent) parent.removeChild(el);\n\
+  }\n\
+};\n\
+\n\
+/**\n\
+ * Set attribute `name` to `val`, or get attr `name`.\n\
+ *\n\
+ * @param {String} name\n\
+ * @param {String} [val]\n\
+ * @return {String|List} self\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.attr = function(name, val){\n\
+  // get\n\
+  if (1 == arguments.length) {\n\
+    return this.els[0] && this.els[0].getAttribute(name);\n\
+  }\n\
+\n\
+  // remove\n\
+  if (null == val) {\n\
+    return this.removeAttr(name);\n\
+  }\n\
+\n\
+  // set\n\
+  return this.forEach(function(el){\n\
+    el.setAttribute(name, val);\n\
+  });\n\
+};\n\
+\n\
+/**\n\
+ * Remove attribute `name`.\n\
+ *\n\
+ * @param {String} name\n\
+ * @return {List} self\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.removeAttr = function(name){\n\
+  return this.forEach(function(el){\n\
+    el.removeAttribute(name);\n\
+  });\n\
+};\n\
+\n\
+/**\n\
+ * Set property `name` to `val`, or get property `name`.\n\
+ *\n\
+ * @param {String} name\n\
+ * @param {String} [val]\n\
+ * @return {Object|List} self\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.prop = function(name, val){\n\
+  if (1 == arguments.length) {\n\
+    return this.els[0] && this.els[0][name];\n\
+  }\n\
+\n\
+  return this.forEach(function(el){\n\
+    el[name] = val;\n\
+  });\n\
+};\n\
+\n\
+/**\n\
+ * Get the first element's value or set selected\n\
+ * element values to `val`.\n\
+ *\n\
+ * @param {Mixed} [val]\n\
+ * @return {Mixed}\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.val =\n\
+List.prototype.value = function(val){\n\
+  if (0 == arguments.length) {\n\
+    return this.els[0]\n\
+      ? value(this.els[0])\n\
+      : undefined;\n\
+  }\n\
+\n\
+  return this.forEach(function(el){\n\
+    value(el, val);\n\
+  });\n\
+};\n\
+\n\
+/**\n\
+ * Return a cloned `List` with all elements cloned.\n\
+ *\n\
+ * @return {List}\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.clone = function(){\n\
+  var arr = [];\n\
+  for (var i = 0, len = this.els.length; i < len; ++i) {\n\
+    arr.push(this.els[i].cloneNode(true));\n\
+  }\n\
+  return new List(arr);\n\
+};\n\
+\n\
+/**\n\
+ * Prepend `val`.\n\
+ *\n\
+ * @param {String|Element|List} val\n\
+ * @return {List} new list\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.prepend = function(val){\n\
+  var el = this.els[0];\n\
+  if (!el) return this;\n\
+  val = dom(val);\n\
+  for (var i = 0; i < val.els.length; ++i) {\n\
+    if (el.children.length) {\n\
+      el.insertBefore(val.els[i], el.firstChild);\n\
+    } else {\n\
+      el.appendChild(val.els[i]);\n\
+    }\n\
+  }\n\
+  return val;\n\
+};\n\
+\n\
+/**\n\
+ * Append `val`.\n\
+ *\n\
+ * @param {String|Element|List} val\n\
+ * @return {List} new list\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.append = function(val){\n\
+  var el = this.els[0];\n\
+  if (!el) return this;\n\
+  val = dom(val);\n\
+  for (var i = 0; i < val.els.length; ++i) {\n\
+    el.appendChild(val.els[i]);\n\
+  }\n\
+  return val;\n\
+};\n\
+\n\
+/**\n\
+ * Append self's `el` to `val`\n\
+ *\n\
+ * @param {String|Element|List} val\n\
+ * @return {List} self\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.appendTo = function(val){\n\
+  dom(val).append(this);\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Insert self's `els` after `val`\n\
+ *\n\
+ * @param {String|Element|List} val\n\
+ * @return {List} self\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.insertAfter = function(val){\n\
+  val = dom(val).els[0];\n\
+  if (!val || !val.parentNode) return this;\n\
+  this.forEach(function(el){\n\
+    val.parentNode.insertBefore(el, val.nextSibling);\n\
+  });\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Return a `List` containing the element at `i`.\n\
+ *\n\
+ * @param {Number} i\n\
+ * @return {List}\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.at = function(i){\n\
+  return new List([this.els[i]], this.selector);\n\
+};\n\
+\n\
+/**\n\
+ * Return a `List` containing the first element.\n\
+ *\n\
+ * @param {Number} i\n\
+ * @return {List}\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.first = function(){\n\
+  return new List([this.els[0]], this.selector);\n\
+};\n\
+\n\
+/**\n\
+ * Return a `List` containing the last element.\n\
+ *\n\
+ * @param {Number} i\n\
+ * @return {List}\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.last = function(){\n\
+  return new List([this.els[this.els.length - 1]], this.selector);\n\
+};\n\
+\n\
+/**\n\
+ * Return an `Element` at `i`.\n\
+ *\n\
+ * @param {Number} i\n\
+ * @return {Element}\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.get = function(i){\n\
+  return this.els[i || 0];\n\
+};\n\
+\n\
+/**\n\
+ * Return list length.\n\
+ *\n\
+ * @return {Number}\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.length = function(){\n\
+  return this.els.length;\n\
+};\n\
+\n\
+/**\n\
+ * Return element text.\n\
+ *\n\
+ * @param {String} str\n\
+ * @return {String|List}\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.text = function(str){\n\
+  // TODO: real impl\n\
+  if (1 == arguments.length) {\n\
+    this.forEach(function(el){\n\
+      el.textContent = str;\n\
+    });\n\
+    return this;\n\
+  }\n\
+\n\
+  var str = '';\n\
+  for (var i = 0; i < this.els.length; ++i) {\n\
+    str += this.els[i].textContent;\n\
+  }\n\
+  return str;\n\
+};\n\
+\n\
+/**\n\
+ * Return element html.\n\
+ *\n\
+ * @return {String} html\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.html = function(html){\n\
+  if (1 == arguments.length) {\n\
+    return this.forEach(function(el){\n\
+      el.innerHTML = html;\n\
+    });\n\
+  }\n\
+\n\
+  // TODO: real impl\n\
+  return this.els[0] && this.els[0].innerHTML;\n\
+};\n\
+\n\
+/**\n\
+ * Bind to `event` and invoke `fn(e)`. When\n\
+ * a `selector` is given then events are delegated.\n\
+ *\n\
+ * @param {String} event\n\
+ * @param {String} [selector]\n\
+ * @param {Function} fn\n\
+ * @param {Boolean} capture\n\
+ * @return {List}\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.on = function(event, selector, fn, capture){\n\
+  if ('string' == typeof selector) {\n\
+    for (var i = 0; i < this.els.length; ++i) {\n\
+      fn._delegate = delegate.bind(this.els[i], selector, event, fn, capture);\n\
+    }\n\
+    return this;\n\
+  }\n\
+\n\
+  capture = fn;\n\
+  fn = selector;\n\
+\n\
+  for (var i = 0; i < this.els.length; ++i) {\n\
+    events.bind(this.els[i], event, fn, capture);\n\
+  }\n\
+\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Unbind to `event` and invoke `fn(e)`. When\n\
+ * a `selector` is given then delegated event\n\
+ * handlers are unbound.\n\
+ *\n\
+ * @param {String} event\n\
+ * @param {String} [selector]\n\
+ * @param {Function} fn\n\
+ * @param {Boolean} capture\n\
+ * @return {List}\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.off = function(event, selector, fn, capture){\n\
+  if ('string' == typeof selector) {\n\
+    for (var i = 0; i < this.els.length; ++i) {\n\
+      // TODO: add selector support back\n\
+      delegate.unbind(this.els[i], event, fn._delegate, capture);\n\
+    }\n\
+    return this;\n\
+  }\n\
+\n\
+  capture = fn;\n\
+  fn = selector;\n\
+\n\
+  for (var i = 0; i < this.els.length; ++i) {\n\
+    events.unbind(this.els[i], event, fn, capture);\n\
+  }\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Iterate elements and invoke `fn(list, i)`.\n\
+ *\n\
+ * @param {Function} fn\n\
+ * @return {List} self\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.each = function(fn){\n\
+  for (var i = 0; i < this.els.length; ++i) {\n\
+    fn(new List([this.els[i]], this.selector), i);\n\
+  }\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Iterate elements and invoke `fn(el, i)`.\n\
+ *\n\
+ * @param {Function} fn\n\
+ * @return {List} self\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.forEach = function(fn){\n\
+  for (var i = 0; i < this.els.length; ++i) {\n\
+    fn(this.els[i], i);\n\
+  }\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Map elements invoking `fn(list, i)`.\n\
+ *\n\
+ * @param {Function} fn\n\
+ * @return {Array}\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.map = function(fn){\n\
+  var arr = [];\n\
+  for (var i = 0; i < this.els.length; ++i) {\n\
+    arr.push(fn(new List([this.els[i]], this.selector), i));\n\
+  }\n\
+  return arr;\n\
+};\n\
+\n\
+/**\n\
+ * Filter elements invoking `fn(list, i)`, returning\n\
+ * a new `List` of elements when a truthy value is returned.\n\
+ *\n\
+ * @param {Function} fn\n\
+ * @return {List}\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.select =\n\
+List.prototype.filter = function(fn){\n\
+  var el;\n\
+  var list = new List([], this.selector);\n\
+  for (var i = 0; i < this.els.length; ++i) {\n\
+    el = this.els[i];\n\
+    if (fn(new List([el], this.selector), i)) list.els.push(el);\n\
+  }\n\
+  return list;\n\
+};\n\
+\n\
+/**\n\
+ * Filter elements invoking `fn(list, i)`, returning\n\
+ * a new `List` of elements when a falsey value is returned.\n\
+ *\n\
+ * @param {Function} fn\n\
+ * @return {List}\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.reject = function(fn){\n\
+  var el;\n\
+  var list = new List([], this.selector);\n\
+  for (var i = 0; i < this.els.length; ++i) {\n\
+    el = this.els[i];\n\
+    if (!fn(new List([el], this.selector), i)) list.els.push(el);\n\
+  }\n\
+  return list;\n\
+};\n\
+\n\
+/**\n\
+ * Add the given class `name`.\n\
+ *\n\
+ * @param {String} name\n\
+ * @return {List} self\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.addClass = function(name){\n\
+  var el;\n\
+  for (var i = 0; i < this.els.length; ++i) {\n\
+    el = this.els[i];\n\
+    el._classes = el._classes || classes(el);\n\
+    el._classes.add(name);\n\
+  }\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Remove the given class `name`.\n\
+ *\n\
+ * @param {String|RegExp} name\n\
+ * @return {List} self\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.removeClass = function(name){\n\
+  var el;\n\
+\n\
+  if ('regexp' == type(name)) {\n\
+    for (var i = 0; i < this.els.length; ++i) {\n\
+      el = this.els[i];\n\
+      el._classes = el._classes || classes(el);\n\
+      var arr = el._classes.array();\n\
+      for (var j = 0; j < arr.length; j++) {\n\
+        if (name.test(arr[j])) {\n\
+          el._classes.remove(arr[j]);\n\
+        }\n\
+      }\n\
+    }\n\
+    return this;\n\
+  }\n\
+\n\
+  for (var i = 0; i < this.els.length; ++i) {\n\
+    el = this.els[i];\n\
+    el._classes = el._classes || classes(el);\n\
+    el._classes.remove(name);\n\
+  }\n\
+\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Toggle the given class `name`,\n\
+ * optionally a `bool` may be given\n\
+ * to indicate that the class should\n\
+ * be added when truthy.\n\
+ *\n\
+ * @param {String} name\n\
+ * @param {Boolean} bool\n\
+ * @return {List} self\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.toggleClass = function(name, bool){\n\
+  var el;\n\
+  var fn = 'toggle';\n\
+\n\
+  // toggle with boolean\n\
+  if (2 == arguments.length) {\n\
+    fn = bool ? 'add' : 'remove';\n\
+  }\n\
+\n\
+  for (var i = 0; i < this.els.length; ++i) {\n\
+    el = this.els[i];\n\
+    el._classes = el._classes || classes(el);\n\
+    el._classes[fn](name);\n\
+  }\n\
+\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Check if the given class `name` is present.\n\
+ *\n\
+ * @param {String} name\n\
+ * @return {Boolean}\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.hasClass = function(name){\n\
+  var el;\n\
+  for (var i = 0; i < this.els.length; ++i) {\n\
+    el = this.els[i];\n\
+    el._classes = el._classes || classes(el);\n\
+    if (el._classes.has(name)) return true;\n\
+  }\n\
+  return false;\n\
+};\n\
+\n\
+/**\n\
+ * Set CSS `prop` to `val` or get `prop` value.\n\
+ * Also accepts an object (`prop`: `val`)\n\
+ *\n\
+ * @param {String} prop\n\
+ * @param {Mixed} val\n\
+ * @return {List|String}\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.css = function(prop, val){\n\
+  if (2 == arguments.length) {\n\
+    var obj = {};\n\
+    obj[prop] = val;\n\
+    return this.setStyle(obj);\n\
+  }\n\
+\n\
+  if ('object' == type(prop)) {\n\
+    return this.setStyle(prop);\n\
+  }\n\
+\n\
+  return this.getStyle(prop);\n\
+};\n\
+\n\
+/**\n\
+ * Set CSS `props`.\n\
+ *\n\
+ * @param {Object} props\n\
+ * @return {List} self\n\
+ * @api private\n\
+ */\n\
+\n\
+List.prototype.setStyle = function(props){\n\
+  for (var i = 0; i < this.els.length; ++i) {\n\
+    css(this.els[i], props);\n\
+  }\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Get CSS `prop` value.\n\
+ *\n\
+ * @param {String} prop\n\
+ * @return {String}\n\
+ * @api private\n\
+ */\n\
+\n\
+List.prototype.getStyle = function(prop){\n\
+  var el = this.els[0];\n\
+  if (el) return el.style[prop];\n\
+};\n\
+\n\
+/**\n\
+ * Find children matching the given `selector`.\n\
+ *\n\
+ * @param {String} selector\n\
+ * @return {List}\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.find = function(selector){\n\
+  return dom(selector, this);\n\
+};\n\
+\n\
+/**\n\
+ * Empty the dom list\n\
+ *\n\
+ * @return self\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.empty = function(){\n\
+  var elem, el;\n\
+\n\
+  for (var i = 0; i < this.els.length; ++i) {\n\
+    el = this.els[i];\n\
+    while (el.firstChild) {\n\
+      el.removeChild(el.firstChild);\n\
+    }\n\
+  }\n\
+\n\
+  return this;\n\
+}\n\
+\n\
+/**\n\
+ * Check if the first element matches `selector`.\n\
+ *\n\
+ * @param {String} selector\n\
+ * @return {Boolean}\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.is = function(selector){\n\
+  return matches(this.get(0), selector);\n\
+};\n\
+\n\
+/**\n\
+ * Get parent(s) with optional `selector` and `limit`\n\
+ *\n\
+ * @param {String} selector\n\
+ * @param {Number} limit\n\
+ * @return {List}\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.parent = function(selector, limit){\n\
+  return new List(traverse('parentNode',\n\
+    this.get(0),\n\
+    selector,\n\
+    limit\n\
+    || 1));\n\
+};\n\
+\n\
+/**\n\
+ * Get next element(s) with optional `selector` and `limit`.\n\
+ *\n\
+ * @param {String} selector\n\
+ * @param {Number} limit\n\
+ * @retrun {List}\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.next = function(selector, limit){\n\
+  return new List(traverse('nextSibling',\n\
+    this.get(0),\n\
+    selector,\n\
+    limit\n\
+    || 1));\n\
+};\n\
+\n\
+/**\n\
+ * Get previous element(s) with optional `selector` and `limit`.\n\
+ *\n\
+ * @param {String} selector\n\
+ * @param {Number} limit\n\
+ * @return {List}\n\
+ * @api public\n\
+ */\n\
+\n\
+List.prototype.prev =\n\
+List.prototype.previous = function(selector, limit){\n\
+  return new List(traverse('previousSibling',\n\
+    this.get(0),\n\
+    selector,\n\
+    limit\n\
+    || 1));\n\
+};\n\
+\n\
+/**\n\
+ * Attribute accessors.\n\
+ */\n\
+\n\
+attrs.forEach(function(name){\n\
+  List.prototype[name] = function(val){\n\
+    if (0 == arguments.length) return this.attr(name);\n\
+    return this.attr(name, val);\n\
+  };\n\
+});\n\
+\n\
+//@ sourceURL=component-dom/index.js"
+));
+require.register("component-os/index.js", Function("exports, require, module",
+"\n\
+\n\
+module.exports = os();\n\
+\n\
+function os() {\n\
+  var ua = navigator.userAgent;\n\
+  if (/mac/i.test(ua)) return 'mac';\n\
+  if (/win/i.test(ua)) return 'windows';\n\
+  if (/linux/i.test(ua)) return 'linux';\n\
+}\n\
+//@ sourceURL=component-os/index.js"
+));
+require.register("component-emitter/index.js", Function("exports, require, module",
+"\n\
+/**\n\
+ * Module dependencies.\n\
+ */\n\
+\n\
+var index = require('indexof');\n\
+\n\
+/**\n\
+ * Expose `Emitter`.\n\
+ */\n\
+\n\
+module.exports = Emitter;\n\
+\n\
+/**\n\
+ * Initialize a new `Emitter`.\n\
+ *\n\
+ * @api public\n\
+ */\n\
+\n\
+function Emitter(obj) {\n\
+  if (obj) return mixin(obj);\n\
+};\n\
+\n\
+/**\n\
+ * Mixin the emitter properties.\n\
+ *\n\
+ * @param {Object} obj\n\
+ * @return {Object}\n\
+ * @api private\n\
+ */\n\
+\n\
+function mixin(obj) {\n\
+  for (var key in Emitter.prototype) {\n\
+    obj[key] = Emitter.prototype[key];\n\
+  }\n\
+  return obj;\n\
+}\n\
+\n\
+/**\n\
+ * Listen on the given `event` with `fn`.\n\
+ *\n\
+ * @param {String} event\n\
+ * @param {Function} fn\n\
+ * @return {Emitter}\n\
+ * @api public\n\
+ */\n\
+\n\
+Emitter.prototype.on =\n\
+Emitter.prototype.addEventListener = function(event, fn){\n\
+  this._callbacks = this._callbacks || {};\n\
+  (this._callbacks[event] = this._callbacks[event] || [])\n\
+    .push(fn);\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Adds an `event` listener that will be invoked a single\n\
+ * time then automatically removed.\n\
+ *\n\
+ * @param {String} event\n\
+ * @param {Function} fn\n\
+ * @return {Emitter}\n\
+ * @api public\n\
+ */\n\
+\n\
+Emitter.prototype.once = function(event, fn){\n\
+  var self = this;\n\
+  this._callbacks = this._callbacks || {};\n\
+\n\
+  function on() {\n\
+    self.off(event, on);\n\
+    fn.apply(this, arguments);\n\
+  }\n\
+\n\
+  fn._off = on;\n\
+  this.on(event, on);\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Remove the given callback for `event` or all\n\
+ * registered callbacks.\n\
+ *\n\
+ * @param {String} event\n\
+ * @param {Function} fn\n\
+ * @return {Emitter}\n\
+ * @api public\n\
+ */\n\
+\n\
+Emitter.prototype.off =\n\
+Emitter.prototype.removeListener =\n\
+Emitter.prototype.removeAllListeners =\n\
+Emitter.prototype.removeEventListener = function(event, fn){\n\
+  this._callbacks = this._callbacks || {};\n\
+\n\
+  // all\n\
+  if (0 == arguments.length) {\n\
+    this._callbacks = {};\n\
+    return this;\n\
+  }\n\
+\n\
+  // specific event\n\
+  var callbacks = this._callbacks[event];\n\
+  if (!callbacks) return this;\n\
+\n\
+  // remove all handlers\n\
+  if (1 == arguments.length) {\n\
+    delete this._callbacks[event];\n\
+    return this;\n\
+  }\n\
+\n\
+  // remove specific handler\n\
+  var i = index(callbacks, fn._off || fn);\n\
+  if (~i) callbacks.splice(i, 1);\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Emit `event` with the given args.\n\
+ *\n\
+ * @param {String} event\n\
+ * @param {Mixed} ...\n\
+ * @return {Emitter}\n\
+ */\n\
+\n\
+Emitter.prototype.emit = function(event){\n\
+  this._callbacks = this._callbacks || {};\n\
+  var args = [].slice.call(arguments, 1)\n\
+    , callbacks = this._callbacks[event];\n\
+\n\
+  if (callbacks) {\n\
+    callbacks = callbacks.slice(0);\n\
+    for (var i = 0, len = callbacks.length; i < len; ++i) {\n\
+      callbacks[i].apply(this, args);\n\
+    }\n\
+  }\n\
+\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Return array of callbacks for `event`.\n\
+ *\n\
+ * @param {String} event\n\
+ * @return {Array}\n\
+ * @api public\n\
+ */\n\
+\n\
+Emitter.prototype.listeners = function(event){\n\
+  this._callbacks = this._callbacks || {};\n\
+  return this._callbacks[event] || [];\n\
+};\n\
+\n\
+/**\n\
+ * Check if this emitter has `event` handlers.\n\
+ *\n\
+ * @param {String} event\n\
+ * @return {Boolean}\n\
+ * @api public\n\
+ */\n\
+\n\
+Emitter.prototype.hasListeners = function(event){\n\
+  return !! this.listeners(event).length;\n\
+};\n\
+//@ sourceURL=component-emitter/index.js"
+));
+require.register("RedVentures-reduce/index.js", Function("exports, require, module",
+"\n\
+/**\n\
+ * Reduce `arr` with `fn`.\n\
+ *\n\
+ * @param {Array} arr\n\
+ * @param {Function} fn\n\
+ * @param {Mixed} initial\n\
+ *\n\
+ * TODO: combatible error handling?\n\
+ */\n\
+\n\
+module.exports = function(arr, fn, initial){  \n\
+  var idx = 0;\n\
+  var len = arr.length;\n\
+  var curr = arguments.length == 3\n\
+    ? initial\n\
+    : arr[idx++];\n\
+\n\
+  while (idx < len) {\n\
+    curr = fn.call(null, curr, arr[idx], ++idx, arr);\n\
+  }\n\
+  \n\
+  return curr;\n\
+};//@ sourceURL=RedVentures-reduce/index.js"
+));
+require.register("visionmedia-superagent/lib/client.js", Function("exports, require, module",
+"/**\n\
+ * Module dependencies.\n\
+ */\n\
+\n\
+var Emitter = require('emitter');\n\
+var reduce = require('reduce');\n\
+\n\
+/**\n\
+ * Root reference for iframes.\n\
+ */\n\
+\n\
+var root = 'undefined' == typeof window\n\
+  ? this\n\
+  : window;\n\
+\n\
+/**\n\
+ * Noop.\n\
+ */\n\
+\n\
+function noop(){};\n\
+\n\
+/**\n\
+ * Check if `obj` is a host object,\n\
+ * we don't want to serialize these :)\n\
+ *\n\
+ * TODO: future proof, move to compoent land\n\
+ *\n\
+ * @param {Object} obj\n\
+ * @return {Boolean}\n\
+ * @api private\n\
+ */\n\
+\n\
+function isHost(obj) {\n\
+  var str = {}.toString.call(obj);\n\
+\n\
+  switch (str) {\n\
+    case '[object File]':\n\
+    case '[object Blob]':\n\
+    case '[object FormData]':\n\
+      return true;\n\
+    default:\n\
+      return false;\n\
+  }\n\
+}\n\
+\n\
+/**\n\
+ * Determine XHR.\n\
+ */\n\
+\n\
+function getXHR() {\n\
+  if (root.XMLHttpRequest\n\
+    && ('file:' != root.location.protocol || !root.ActiveXObject)) {\n\
+    return new XMLHttpRequest;\n\
+  } else {\n\
+    try { return new ActiveXObject('Microsoft.XMLHTTP'); } catch(e) {}\n\
+    try { return new ActiveXObject('Msxml2.XMLHTTP.6.0'); } catch(e) {}\n\
+    try { return new ActiveXObject('Msxml2.XMLHTTP.3.0'); } catch(e) {}\n\
+    try { return new ActiveXObject('Msxml2.XMLHTTP'); } catch(e) {}\n\
+  }\n\
+  return false;\n\
+}\n\
+\n\
+/**\n\
+ * Removes leading and trailing whitespace, added to support IE.\n\
+ *\n\
+ * @param {String} s\n\
+ * @return {String}\n\
+ * @api private\n\
+ */\n\
+\n\
+var trim = ''.trim\n\
+  ? function(s) { return s.trim(); }\n\
+  : function(s) { return s.replace(/(^\\s*|\\s*$)/g, ''); };\n\
+\n\
+/**\n\
+ * Check if `obj` is an object.\n\
+ *\n\
+ * @param {Object} obj\n\
+ * @return {Boolean}\n\
+ * @api private\n\
+ */\n\
+\n\
+function isObject(obj) {\n\
+  return obj === Object(obj);\n\
+}\n\
+\n\
+/**\n\
+ * Serialize the given `obj`.\n\
+ *\n\
+ * @param {Object} obj\n\
+ * @return {String}\n\
+ * @api private\n\
+ */\n\
+\n\
+function serialize(obj) {\n\
+  if (!isObject(obj)) return obj;\n\
+  var pairs = [];\n\
+  for (var key in obj) {\n\
+    pairs.push(encodeURIComponent(key)\n\
+      + '=' + encodeURIComponent(obj[key]));\n\
+  }\n\
+  return pairs.join('&');\n\
+}\n\
+\n\
+/**\n\
+ * Expose serialization method.\n\
+ */\n\
+\n\
+ request.serializeObject = serialize;\n\
+\n\
+ /**\n\
+  * Parse the given x-www-form-urlencoded `str`.\n\
+  *\n\
+  * @param {String} str\n\
+  * @return {Object}\n\
+  * @api private\n\
+  */\n\
+\n\
+function parseString(str) {\n\
+  var obj = {};\n\
+  var pairs = str.split('&');\n\
+  var parts;\n\
+  var pair;\n\
+\n\
+  for (var i = 0, len = pairs.length; i < len; ++i) {\n\
+    pair = pairs[i];\n\
+    parts = pair.split('=');\n\
+    obj[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1]);\n\
+  }\n\
+\n\
+  return obj;\n\
+}\n\
+\n\
+/**\n\
+ * Expose parser.\n\
+ */\n\
+\n\
+request.parseString = parseString;\n\
+\n\
+/**\n\
+ * Default MIME type map.\n\
+ *\n\
+ *     superagent.types.xml = 'application/xml';\n\
+ *\n\
+ */\n\
+\n\
+request.types = {\n\
+  html: 'text/html',\n\
+  json: 'application/json',\n\
+  urlencoded: 'application/x-www-form-urlencoded',\n\
+  'form': 'application/x-www-form-urlencoded',\n\
+  'form-data': 'application/x-www-form-urlencoded'\n\
+};\n\
+\n\
+/**\n\
+ * Default serialization map.\n\
+ *\n\
+ *     superagent.serialize['application/xml'] = function(obj){\n\
+ *       return 'generated xml here';\n\
+ *     };\n\
+ *\n\
+ */\n\
+\n\
+ request.serialize = {\n\
+   'application/x-www-form-urlencoded': serialize,\n\
+   'application/json': JSON.stringify\n\
+ };\n\
+\n\
+ /**\n\
+  * Default parsers.\n\
+  *\n\
+  *     superagent.parse['application/xml'] = function(str){\n\
+  *       return { object parsed from str };\n\
+  *     };\n\
+  *\n\
+  */\n\
+\n\
+request.parse = {\n\
+  'application/x-www-form-urlencoded': parseString,\n\
+  'application/json': JSON.parse\n\
+};\n\
+\n\
+/**\n\
+ * Parse the given header `str` into\n\
+ * an object containing the mapped fields.\n\
+ *\n\
+ * @param {String} str\n\
+ * @return {Object}\n\
+ * @api private\n\
+ */\n\
+\n\
+function parseHeader(str) {\n\
+  var lines = str.split(/\\r?\\n\
+/);\n\
+  var fields = {};\n\
+  var index;\n\
+  var line;\n\
+  var field;\n\
+  var val;\n\
+\n\
+  lines.pop(); // trailing CRLF\n\
+\n\
+  for (var i = 0, len = lines.length; i < len; ++i) {\n\
+    line = lines[i];\n\
+    index = line.indexOf(':');\n\
+    field = line.slice(0, index).toLowerCase();\n\
+    val = trim(line.slice(index + 1));\n\
+    fields[field] = val;\n\
+  }\n\
+\n\
+  return fields;\n\
+}\n\
+\n\
+/**\n\
+ * Return the mime type for the given `str`.\n\
+ *\n\
+ * @param {String} str\n\
+ * @return {String}\n\
+ * @api private\n\
+ */\n\
+\n\
+function type(str){\n\
+  return str.split(/ *; */).shift();\n\
+};\n\
+\n\
+/**\n\
+ * Return header field parameters.\n\
+ *\n\
+ * @param {String} str\n\
+ * @return {Object}\n\
+ * @api private\n\
+ */\n\
+\n\
+function params(str){\n\
+  return reduce(str.split(/ *; */), function(obj, str){\n\
+    var parts = str.split(/ *= */)\n\
+      , key = parts.shift()\n\
+      , val = parts.shift();\n\
+\n\
+    if (key && val) obj[key] = val;\n\
+    return obj;\n\
+  }, {});\n\
+};\n\
+\n\
+/**\n\
+ * Initialize a new `Response` with the given `xhr`.\n\
+ *\n\
+ *  - set flags (.ok, .error, etc)\n\
+ *  - parse header\n\
+ *\n\
+ * Examples:\n\
+ *\n\
+ *  Aliasing `superagent` as `request` is nice:\n\
+ *\n\
+ *      request = superagent;\n\
+ *\n\
+ *  We can use the promise-like API, or pass callbacks:\n\
+ *\n\
+ *      request.get('/').end(function(res){});\n\
+ *      request.get('/', function(res){});\n\
+ *\n\
+ *  Sending data can be chained:\n\
+ *\n\
+ *      request\n\
+ *        .post('/user')\n\
+ *        .send({ name: 'tj' })\n\
+ *        .end(function(res){});\n\
+ *\n\
+ *  Or passed to `.send()`:\n\
+ *\n\
+ *      request\n\
+ *        .post('/user')\n\
+ *        .send({ name: 'tj' }, function(res){});\n\
+ *\n\
+ *  Or passed to `.post()`:\n\
+ *\n\
+ *      request\n\
+ *        .post('/user', { name: 'tj' })\n\
+ *        .end(function(res){});\n\
+ *\n\
+ * Or further reduced to a single call for simple cases:\n\
+ *\n\
+ *      request\n\
+ *        .post('/user', { name: 'tj' }, function(res){});\n\
+ *\n\
+ * @param {XMLHTTPRequest} xhr\n\
+ * @param {Object} options\n\
+ * @api private\n\
+ */\n\
+\n\
+function Response(req, options) {\n\
+  options = options || {};\n\
+  this.req = req;\n\
+  this.xhr = this.req.xhr;\n\
+  this.text = this.xhr.responseText;\n\
+  this.setStatusProperties(this.xhr.status);\n\
+  this.header = this.headers = parseHeader(this.xhr.getAllResponseHeaders());\n\
+  // getAllResponseHeaders sometimes falsely returns \"\" for CORS requests, but\n\
+  // getResponseHeader still works. so we get content-type even if getting\n\
+  // other headers fails.\n\
+  this.header['content-type'] = this.xhr.getResponseHeader('content-type');\n\
+  this.setHeaderProperties(this.header);\n\
+  this.body = this.parseBody(this.text);\n\
+}\n\
+\n\
+/**\n\
+ * Get case-insensitive `field` value.\n\
+ *\n\
+ * @param {String} field\n\
+ * @return {String}\n\
+ * @api public\n\
+ */\n\
+\n\
+Response.prototype.get = function(field){\n\
+  return this.header[field.toLowerCase()];\n\
+};\n\
+\n\
+/**\n\
+ * Set header related properties:\n\
+ *\n\
+ *   - `.type` the content type without params\n\
+ *\n\
+ * A response of \"Content-Type: text/plain; charset=utf-8\"\n\
+ * will provide you with a `.type` of \"text/plain\".\n\
+ *\n\
+ * @param {Object} header\n\
+ * @api private\n\
+ */\n\
+\n\
+Response.prototype.setHeaderProperties = function(header){\n\
+  // content-type\n\
+  var ct = this.header['content-type'] || '';\n\
+  this.type = type(ct);\n\
+\n\
+  // params\n\
+  var obj = params(ct);\n\
+  for (var key in obj) this[key] = obj[key];\n\
+};\n\
+\n\
+/**\n\
+ * Parse the given body `str`.\n\
+ *\n\
+ * Used for auto-parsing of bodies. Parsers\n\
+ * are defined on the `superagent.parse` object.\n\
+ *\n\
+ * @param {String} str\n\
+ * @return {Mixed}\n\
+ * @api private\n\
+ */\n\
+\n\
+Response.prototype.parseBody = function(str){\n\
+  var parse = request.parse[this.type];\n\
+  return parse\n\
+    ? parse(str)\n\
+    : null;\n\
+};\n\
+\n\
+/**\n\
+ * Set flags such as `.ok` based on `status`.\n\
+ *\n\
+ * For example a 2xx response will give you a `.ok` of __true__\n\
+ * whereas 5xx will be __false__ and `.error` will be __true__. The\n\
+ * `.clientError` and `.serverError` are also available to be more\n\
+ * specific, and `.statusType` is the class of error ranging from 1..5\n\
+ * sometimes useful for mapping respond colors etc.\n\
+ *\n\
+ * \"sugar\" properties are also defined for common cases. Currently providing:\n\
+ *\n\
+ *   - .noContent\n\
+ *   - .badRequest\n\
+ *   - .unauthorized\n\
+ *   - .notAcceptable\n\
+ *   - .notFound\n\
+ *\n\
+ * @param {Number} status\n\
+ * @api private\n\
+ */\n\
+\n\
+Response.prototype.setStatusProperties = function(status){\n\
+  var type = status / 100 | 0;\n\
+\n\
+  // status / class\n\
+  this.status = status;\n\
+  this.statusType = type;\n\
+\n\
+  // basics\n\
+  this.info = 1 == type;\n\
+  this.ok = 2 == type;\n\
+  this.clientError = 4 == type;\n\
+  this.serverError = 5 == type;\n\
+  this.error = (4 == type || 5 == type)\n\
+    ? this.toError()\n\
+    : false;\n\
+\n\
+  // sugar\n\
+  this.accepted = 202 == status;\n\
+  this.noContent = 204 == status || 1223 == status;\n\
+  this.badRequest = 400 == status;\n\
+  this.unauthorized = 401 == status;\n\
+  this.notAcceptable = 406 == status;\n\
+  this.notFound = 404 == status;\n\
+  this.forbidden = 403 == status;\n\
+};\n\
+\n\
+/**\n\
+ * Return an `Error` representative of this response.\n\
+ *\n\
+ * @return {Error}\n\
+ * @api public\n\
+ */\n\
+\n\
+Response.prototype.toError = function(){\n\
+  var req = this.req;\n\
+  var method = req.method;\n\
+  var path = req.path;\n\
+\n\
+  var msg = 'cannot ' + method + ' ' + path + ' (' + this.status + ')';\n\
+  var err = new Error(msg);\n\
+  err.status = this.status;\n\
+  err.method = method;\n\
+  err.path = path;\n\
+\n\
+  return err;\n\
+};\n\
+\n\
+/**\n\
+ * Expose `Response`.\n\
+ */\n\
+\n\
+request.Response = Response;\n\
+\n\
+/**\n\
+ * Initialize a new `Request` with the given `method` and `url`.\n\
+ *\n\
+ * @param {String} method\n\
+ * @param {String} url\n\
+ * @api public\n\
+ */\n\
+\n\
+function Request(method, url) {\n\
+  var self = this;\n\
+  Emitter.call(this);\n\
+  this._query = this._query || [];\n\
+  this.method = method;\n\
+  this.url = url;\n\
+  this.header = {};\n\
+  this._header = {};\n\
+  this.on('end', function(){\n\
+    var res = new Response(self);\n\
+    if ('HEAD' == method) res.text = null;\n\
+    self.callback(null, res);\n\
+  });\n\
+}\n\
+\n\
+/**\n\
+ * Mixin `Emitter`.\n\
+ */\n\
+\n\
+Emitter(Request.prototype);\n\
+\n\
+/**\n\
+ * Set timeout to `ms`.\n\
+ *\n\
+ * @param {Number} ms\n\
+ * @return {Request} for chaining\n\
+ * @api public\n\
+ */\n\
+\n\
+Request.prototype.timeout = function(ms){\n\
+  this._timeout = ms;\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Clear previous timeout.\n\
+ *\n\
+ * @return {Request} for chaining\n\
+ * @api public\n\
+ */\n\
+\n\
+Request.prototype.clearTimeout = function(){\n\
+  this._timeout = 0;\n\
+  clearTimeout(this._timer);\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Abort the request, and clear potential timeout.\n\
+ *\n\
+ * @return {Request}\n\
+ * @api public\n\
+ */\n\
+\n\
+Request.prototype.abort = function(){\n\
+  if (this.aborted) return;\n\
+  this.aborted = true;\n\
+  this.xhr.abort();\n\
+  this.clearTimeout();\n\
+  this.emit('abort');\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Set header `field` to `val`, or multiple fields with one object.\n\
+ *\n\
+ * Examples:\n\
+ *\n\
+ *      req.get('/')\n\
+ *        .set('Accept', 'application/json')\n\
+ *        .set('X-API-Key', 'foobar')\n\
+ *        .end(callback);\n\
+ *\n\
+ *      req.get('/')\n\
+ *        .set({ Accept: 'application/json', 'X-API-Key': 'foobar' })\n\
+ *        .end(callback);\n\
+ *\n\
+ * @param {String|Object} field\n\
+ * @param {String} val\n\
+ * @return {Request} for chaining\n\
+ * @api public\n\
+ */\n\
+\n\
+Request.prototype.set = function(field, val){\n\
+  if (isObject(field)) {\n\
+    for (var key in field) {\n\
+      this.set(key, field[key]);\n\
+    }\n\
+    return this;\n\
+  }\n\
+  this._header[field.toLowerCase()] = val;\n\
+  this.header[field] = val;\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Get case-insensitive header `field` value.\n\
+ *\n\
+ * @param {String} field\n\
+ * @return {String}\n\
+ * @api private\n\
+ */\n\
+\n\
+Request.prototype.getHeader = function(field){\n\
+  return this._header[field.toLowerCase()];\n\
+};\n\
+\n\
+/**\n\
+ * Set Content-Type to `type`, mapping values from `request.types`.\n\
+ *\n\
+ * Examples:\n\
+ *\n\
+ *      superagent.types.xml = 'application/xml';\n\
+ *\n\
+ *      request.post('/')\n\
+ *        .type('xml')\n\
+ *        .send(xmlstring)\n\
+ *        .end(callback);\n\
+ *\n\
+ *      request.post('/')\n\
+ *        .type('application/xml')\n\
+ *        .send(xmlstring)\n\
+ *        .end(callback);\n\
+ *\n\
+ * @param {String} type\n\
+ * @return {Request} for chaining\n\
+ * @api public\n\
+ */\n\
+\n\
+Request.prototype.type = function(type){\n\
+  this.set('Content-Type', request.types[type] || type);\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Set Authorization field value with `user` and `pass`.\n\
+ *\n\
+ * @param {String} user\n\
+ * @param {String} pass\n\
+ * @return {Request} for chaining\n\
+ * @api public\n\
+ */\n\
+\n\
+Request.prototype.auth = function(user, pass){\n\
+  var str = btoa(user + ':' + pass);\n\
+  this.set('Authorization', 'Basic ' + str);\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+* Add query-string `val`.\n\
+*\n\
+* Examples:\n\
+*\n\
+*   request.get('/shoes')\n\
+*     .query('size=10')\n\
+*     .query({ color: 'blue' })\n\
+*\n\
+* @param {Object|String} val\n\
+* @return {Request} for chaining\n\
+* @api public\n\
+*/\n\
+\n\
+Request.prototype.query = function(val){\n\
+  if ('string' != typeof val) val = serialize(val);\n\
+  if (val) this._query.push(val);\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Send `data`, defaulting the `.type()` to \"json\" when\n\
+ * an object is given.\n\
+ *\n\
+ * Examples:\n\
+ *\n\
+ *       // querystring\n\
+ *       request.get('/search')\n\
+ *         .end(callback)\n\
+ *\n\
+ *       // multiple data \"writes\"\n\
+ *       request.get('/search')\n\
+ *         .send({ search: 'query' })\n\
+ *         .send({ range: '1..5' })\n\
+ *         .send({ order: 'desc' })\n\
+ *         .end(callback)\n\
+ *\n\
+ *       // manual json\n\
+ *       request.post('/user')\n\
+ *         .type('json')\n\
+ *         .send('{\"name\":\"tj\"})\n\
+ *         .end(callback)\n\
+ *\n\
+ *       // auto json\n\
+ *       request.post('/user')\n\
+ *         .send({ name: 'tj' })\n\
+ *         .end(callback)\n\
+ *\n\
+ *       // manual x-www-form-urlencoded\n\
+ *       request.post('/user')\n\
+ *         .type('form')\n\
+ *         .send('name=tj')\n\
+ *         .end(callback)\n\
+ *\n\
+ *       // auto x-www-form-urlencoded\n\
+ *       request.post('/user')\n\
+ *         .type('form')\n\
+ *         .send({ name: 'tj' })\n\
+ *         .end(callback)\n\
+ *\n\
+ *       // defaults to x-www-form-urlencoded\n\
+  *      request.post('/user')\n\
+  *        .send('name=tobi')\n\
+  *        .send('species=ferret')\n\
+  *        .end(callback)\n\
+ *\n\
+ * @param {String|Object} data\n\
+ * @return {Request} for chaining\n\
+ * @api public\n\
+ */\n\
+\n\
+Request.prototype.send = function(data){\n\
+  var obj = isObject(data);\n\
+  var type = this.getHeader('Content-Type');\n\
+\n\
+  // merge\n\
+  if (obj && isObject(this._data)) {\n\
+    for (var key in data) {\n\
+      this._data[key] = data[key];\n\
+    }\n\
+  } else if ('string' == typeof data) {\n\
+    if (!type) this.type('form');\n\
+    type = this.getHeader('Content-Type');\n\
+    if ('application/x-www-form-urlencoded' == type) {\n\
+      this._data = this._data\n\
+        ? this._data + '&' + data\n\
+        : data;\n\
+    } else {\n\
+      this._data = (this._data || '') + data;\n\
+    }\n\
+  } else {\n\
+    this._data = data;\n\
+  }\n\
+\n\
+  if (!obj) return this;\n\
+  if (!type) this.type('json');\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Invoke the callback with `err` and `res`\n\
+ * and handle arity check.\n\
+ *\n\
+ * @param {Error} err\n\
+ * @param {Response} res\n\
+ * @api private\n\
+ */\n\
+\n\
+Request.prototype.callback = function(err, res){\n\
+  var fn = this._callback;\n\
+  if (2 == fn.length) return fn(err, res);\n\
+  if (err) return this.emit('error', err);\n\
+  fn(res);\n\
+};\n\
+\n\
+/**\n\
+ * Invoke callback with x-domain error.\n\
+ *\n\
+ * @api private\n\
+ */\n\
+\n\
+Request.prototype.crossDomainError = function(){\n\
+  var err = new Error('Origin is not allowed by Access-Control-Allow-Origin');\n\
+  err.crossDomain = true;\n\
+  this.callback(err);\n\
+};\n\
+\n\
+/**\n\
+ * Invoke callback with timeout error.\n\
+ *\n\
+ * @api private\n\
+ */\n\
+\n\
+Request.prototype.timeoutError = function(){\n\
+  var timeout = this._timeout;\n\
+  var err = new Error('timeout of ' + timeout + 'ms exceeded');\n\
+  err.timeout = timeout;\n\
+  this.callback(err);\n\
+};\n\
+\n\
+/**\n\
+ * Enable transmission of cookies with x-domain requests.\n\
+ *\n\
+ * Note that for this to work the origin must not be\n\
+ * using \"Access-Control-Allow-Origin\" with a wildcard,\n\
+ * and also must set \"Access-Control-Allow-Credentials\"\n\
+ * to \"true\".\n\
+ *\n\
+ * @api public\n\
+ */\n\
+\n\
+Request.prototype.withCredentials = function(){\n\
+  this._withCredentials = true;\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Initiate request, invoking callback `fn(res)`\n\
+ * with an instanceof `Response`.\n\
+ *\n\
+ * @param {Function} fn\n\
+ * @return {Request} for chaining\n\
+ * @api public\n\
+ */\n\
+\n\
+Request.prototype.end = function(fn){\n\
+  var self = this;\n\
+  var xhr = this.xhr = getXHR();\n\
+  var query = this._query.join('&');\n\
+  var timeout = this._timeout;\n\
+  var data = this._data;\n\
+\n\
+  // store callback\n\
+  this._callback = fn || noop;\n\
+\n\
+  // CORS\n\
+  if (this._withCredentials) xhr.withCredentials = true;\n\
+\n\
+  // state change\n\
+  xhr.onreadystatechange = function(){\n\
+    if (4 != xhr.readyState) return;\n\
+    if (0 == xhr.status) {\n\
+      if (self.aborted) return self.timeoutError();\n\
+      return self.crossDomainError();\n\
+    }\n\
+    self.emit('end');\n\
+  };\n\
+\n\
+  // progress\n\
+  if (xhr.upload) {\n\
+    xhr.upload.onprogress = function(e){\n\
+      e.percent = e.loaded / e.total * 100;\n\
+      self.emit('progress', e);\n\
+    };\n\
+  }\n\
+\n\
+  // timeout\n\
+  if (timeout && !this._timer) {\n\
+    this._timer = setTimeout(function(){\n\
+      self.abort();\n\
+    }, timeout);\n\
+  }\n\
+\n\
+  // querystring\n\
+  if (query) {\n\
+    query = request.serializeObject(query);\n\
+    this.url += ~this.url.indexOf('?')\n\
+      ? '&' + query\n\
+      : '?' + query;\n\
+  }\n\
+\n\
+  // initiate request\n\
+  xhr.open(this.method, this.url, true);\n\
+\n\
+  // body\n\
+  if ('GET' != this.method && 'HEAD' != this.method && 'string' != typeof data && !isHost(data)) {\n\
+    // serialize stuff\n\
+    var serialize = request.serialize[this.getHeader('Content-Type')];\n\
+    if (serialize) data = serialize(data);\n\
+  }\n\
+\n\
+  // set header fields\n\
+  for (var field in this.header) {\n\
+    if (null == this.header[field]) continue;\n\
+    xhr.setRequestHeader(field, this.header[field]);\n\
+  }\n\
+\n\
+  // send stuff\n\
+  xhr.send(data);\n\
+  return this;\n\
+};\n\
+\n\
+/**\n\
+ * Expose `Request`.\n\
+ */\n\
+\n\
+request.Request = Request;\n\
+\n\
+/**\n\
+ * Issue a request:\n\
+ *\n\
+ * Examples:\n\
+ *\n\
+ *    request('GET', '/users').end(callback)\n\
+ *    request('/users').end(callback)\n\
+ *    request('/users', callback)\n\
+ *\n\
+ * @param {String} method\n\
+ * @param {String|Function} url or callback\n\
+ * @return {Request}\n\
+ * @api public\n\
+ */\n\
+\n\
+function request(method, url) {\n\
+  // callback\n\
+  if ('function' == typeof url) {\n\
+    return new Request('GET', method).end(url);\n\
+  }\n\
+\n\
+  // url first\n\
+  if (1 == arguments.length) {\n\
+    return new Request('GET', method);\n\
+  }\n\
+\n\
+  return new Request(method, url);\n\
+}\n\
+\n\
+/**\n\
+ * GET `url` with optional callback `fn(res)`.\n\
+ *\n\
+ * @param {String} url\n\
+ * @param {Mixed|Function} data or fn\n\
+ * @param {Function} fn\n\
+ * @return {Request}\n\
+ * @api public\n\
+ */\n\
+\n\
+request.get = function(url, data, fn){\n\
+  var req = request('GET', url);\n\
+  if ('function' == typeof data) fn = data, data = null;\n\
+  if (data) req.query(data);\n\
+  if (fn) req.end(fn);\n\
+  return req;\n\
+};\n\
+\n\
+/**\n\
+ * GET `url` with optional callback `fn(res)`.\n\
+ *\n\
+ * @param {String} url\n\
+ * @param {Mixed|Function} data or fn\n\
+ * @param {Function} fn\n\
+ * @return {Request}\n\
+ * @api public\n\
+ */\n\
+\n\
+request.head = function(url, data, fn){\n\
+  var req = request('HEAD', url);\n\
+  if ('function' == typeof data) fn = data, data = null;\n\
+  if (data) req.send(data);\n\
+  if (fn) req.end(fn);\n\
+  return req;\n\
+};\n\
+\n\
+/**\n\
+ * DELETE `url` with optional callback `fn(res)`.\n\
+ *\n\
+ * @param {String} url\n\
+ * @param {Function} fn\n\
+ * @return {Request}\n\
+ * @api public\n\
+ */\n\
+\n\
+request.del = function(url, fn){\n\
+  var req = request('DELETE', url);\n\
+  if (fn) req.end(fn);\n\
+  return req;\n\
+};\n\
+\n\
+/**\n\
+ * PATCH `url` with optional `data` and callback `fn(res)`.\n\
+ *\n\
+ * @param {String} url\n\
+ * @param {Mixed} data\n\
+ * @param {Function} fn\n\
+ * @return {Request}\n\
+ * @api public\n\
+ */\n\
+\n\
+request.patch = function(url, data, fn){\n\
+  var req = request('PATCH', url);\n\
+  if ('function' == typeof data) fn = data, data = null;\n\
+  if (data) req.send(data);\n\
+  if (fn) req.end(fn);\n\
+  return req;\n\
+};\n\
+\n\
+/**\n\
+ * POST `url` with optional `data` and callback `fn(res)`.\n\
+ *\n\
+ * @param {String} url\n\
+ * @param {Mixed} data\n\
+ * @param {Function} fn\n\
+ * @return {Request}\n\
+ * @api public\n\
+ */\n\
+\n\
+request.post = function(url, data, fn){\n\
+  var req = request('POST', url);\n\
+  if ('function' == typeof data) fn = data, data = null;\n\
+  if (data) req.send(data);\n\
+  if (fn) req.end(fn);\n\
+  return req;\n\
+};\n\
+\n\
+/**\n\
+ * PUT `url` with optional `data` and callback `fn(res)`.\n\
+ *\n\
+ * @param {String} url\n\
+ * @param {Mixed|Function} data or fn\n\
+ * @param {Function} fn\n\
+ * @return {Request}\n\
+ * @api public\n\
+ */\n\
+\n\
+request.put = function(url, data, fn){\n\
+  var req = request('PUT', url);\n\
+  if ('function' == typeof data) fn = data, data = null;\n\
+  if (data) req.send(data);\n\
+  if (fn) req.end(fn);\n\
+  return req;\n\
+};\n\
+\n\
+/**\n\
+ * Expose `request`.\n\
+ */\n\
+\n\
+module.exports = request;\n\
+//@ sourceURL=visionmedia-superagent/lib/client.js"
+));
+require.register("screenwriter/components/autocomplete.js", Function("exports, require, module",
+"var dom = require('dom');\n\
+\n\
+function getTags(tags) {\n\
+    var goodTags = [];\n\
+    for(i in tags)\n\
+        goodTags.push(tags[i]);\n\
+    return goodTags;\n\
+}\n\
+    \n\
+module.exports.start = function($this) {\n\
+    \n\
+    var settings = { \n\
+        'matchClass' : 'editor-tag-matches', \n\
+        'innerMatchClass' : 'editor-tag-matches-inner',\n\
+        'tagContainer' : 'span', \n\
+        'tagWrap' : 'span', \n\
+        'sort' : true,\n\
+        'url' : null,\n\
+        'delay' : 0,\n\
+        'separator' : ' '\n\
+    };\n\
+\n\
+    var i, \n\
+        tag = {}, \n\
+        userTags = [];\n\
+\n\
+    var matches, \n\
+        fromTab = false;\n\
+    var suggestionsShow = false;\n\
+    var workingTag = \"\";\n\
+    var currentTag = {\"position\": 0, tag: \"\"};\n\
+    var tagMatches = dom(document.createElement(settings.tagContainer));\n\
+    var innerTagMatches = dom(document.createElement('div'));\n\
+    \n\
+    tagMatches.addClass(settings.matchClass);\n\
+    innerTagMatches.addClass(settings.innerMatchClass);\n\
+    tagMatches.append(innerTagMatches);\n\
+    \n\
+    function showSuggestionsDelayed(el, key) {\n\
+        if (settings.delay) {\n\
+            if ($this.timer) clearTimeout($this.timer);\n\
+            $this.timer = setTimeout(function () {\n\
+                showSuggestions(el, key);\n\
+            }, settings.delay);\n\
+        } else {\n\
+            showSuggestions(el, key);\n\
+        }\n\
+    }\n\
+    \n\
+    function getCaret(el) { \n\
+        if (el.selectionStart) { \n\
+            return el.selectionStart; \n\
+        } else if (document.selection) { \n\
+            el.focus(); \n\
+        \n\
+            var r = document.selection.createRange(); \n\
+            if (r == null) { \n\
+                return 0; \n\
+            } \n\
+        \n\
+            var re = el.createTextRange(), \n\
+            rc = re.duplicate(); \n\
+            re.moveToBookmark(r.getBookmark()); \n\
+            rc.setEndPoint('EndToStart', re); \n\
+        \n\
+            return rc.text.length; \n\
+        }  \n\
+        return 0; \n\
+    }\n\
+    function setSelectionRange(el, selectionStart, selectionEnd) {\n\
+        if(el.setSelectionRange) {\n\
+            el.focus();\n\
+            el.setSelectionRange(selectionStart, selectionEnd);\n\
+        } else if(el.createTextRange) {\n\
+            var range = el.createTextRange();\n\
+            range.collapse(true);\n\
+            range.moveEnd('character', selectionEnd);\n\
+            range.moveStart('character', selectionStart);\n\
+            range.select();\n\
+        }\n\
+    }\n\
+    \n\
+    function setCaretToPos(el, pos) {\n\
+        setSelectionRange(el, pos, pos);\n\
+    }\n\
+\n\
+    function showSuggestions(el, key) {\n\
+\n\
+        var charPos = getCaret(el),\n\
+            foundSpace = false,\n\
+            i, \n\
+            html = '';\n\
+            \n\
+        var currPos = charPos,\n\
+            currChar;\n\
+            \n\
+        matches = [];\n\
+        workingTag = '';\n\
+        \n\
+        while(!foundSpace) {\n\
+            currChar = el.value.charAt(currPos);\n\
+            if(currChar != ' ' && currChar == currChar.toUpperCase()) {\n\
+                if(/[a-zA-Z0-9]/.test(currChar))\n\
+                    workingTag = currChar + workingTag;\n\
+                currPos--;\n\
+            } else {\n\
+                foundSpace = true;\n\
+            }\n\
+        }\n\
+\n\
+        if (workingTag) {\n\
+            for (i = 0; i < userTags.length; i++) {\n\
+                if (userTags[i].indexOf(workingTag) === 0) {\n\
+                    matches.push(userTags[i]);\n\
+                }\n\
+            }                \n\
+\n\
+            if (settings.sort) {\n\
+                matches = matches.sort(-1);\n\
+            }                    \n\
+\n\
+            for (i = 0; i < matches.length; i++) {\n\
+                html += '<' + settings.tagWrap + ' class=\"_tag_suggestion\">' + matches[i].toLowerCase() + '</' + settings.tagWrap + '>';\n\
+            }\n\
+\n\
+            innerTagMatches.html(html);\n\
+            \n\
+            suggestionsShow = !!(matches.length);\n\
+        } else {\n\
+            hideSuggestions();\n\
+        }\n\
+    }\n\
+\n\
+    function hideSuggestions() {\n\
+        innerTagMatches.empty();\n\
+        matches = [];\n\
+        suggestionsShow = false;\n\
+    }\n\
+\n\
+    function setSelection() {\n\
+        var v = dom($this).val();\n\
+\n\
+        if (v == dom($this).attr('title') && dom($this).hasClass('hint'))\n\
+            v = '';\n\
+\n\
+        currentTags = v.split(settings.separator);\n\
+        hideSuggestions();\n\
+    }\n\
+\n\
+    function chooseTag(ev, tag) {\n\
+        var toInsert = tag.substr(workingTag.length);\n\
+        var corpus = dom($this).val();\n\
+        var position = getCaret(dom($this).get(0));\n\
+\n\
+        dom($this).val(corpus.substr(0, position) + toInsert + corpus.substr(position));\n\
+        \n\
+        setCaretToPos(dom($this).get(0), position + toInsert.length);\n\
+        \n\
+        setSelection();\n\
+        \n\
+        ev.stopPropagation();\n\
+        ev.preventDefault();\n\
+    }\n\
+\n\
+    function handleKeys(ev) {\n\
+        fromTab = false;\n\
+        var type = ev.type;\n\
+        var resetSelection = false;\n\
+        \n\
+        switch (ev.keyCode) {\n\
+            case 37: // ignore cases (arrow keys)\n\
+            case 38:\n\
+            case 39:\n\
+            case 40: {\n\
+                hideSuggestions();\n\
+                return true;\n\
+            }\n\
+            case 224:\n\
+            case 17:\n\
+            case 16:\n\
+            case 18: {\n\
+                return true;\n\
+            }\n\
+\n\
+            case 8: {\n\
+                // delete - hide selections if we're empty\n\
+                if (this.value == '') {\n\
+                    hideSuggestions();\n\
+                    setSelection();\n\
+                    return true;\n\
+                } else {\n\
+                    type = 'keyup'; // allow drop through\n\
+                    resetSelection = true;\n\
+                    showSuggestionsDelayed(this);\n\
+                }\n\
+                break;\n\
+            }\n\
+\n\
+            case 9: // return and tab\n\
+            case 13: {\n\
+                if (suggestionsShow) {\n\
+                    // complete\n\
+                    chooseTag(ev, matches[0]);\n\
+                    \n\
+                    fromTab = true;\n\
+                    return false;\n\
+                } else {\n\
+                    return true;\n\
+                }\n\
+            }\n\
+            case 27: {\n\
+                hideSuggestions();\n\
+                setSelection();\n\
+                return true;\n\
+            }\n\
+            case 32: {\n\
+                setSelection();\n\
+                return true;\n\
+            }\n\
+        }\n\
+\n\
+        if (type == 'keyup') {\n\
+            switch (ev.charCode) {\n\
+                case 9:\n\
+                case 13: {\n\
+                    return true;\n\
+                }\n\
+            }\n\
+\n\
+            if (resetSelection) { \n\
+                setSelection();\n\
+            }\n\
+            showSuggestionsDelayed(this, ev.charCode);            \n\
+        }\n\
+    }\n\
+\n\
+    dom($this).on('keypress', handleKeys).on('keyup', handleKeys).on('blur', function() {\n\
+        if (fromTab == true || suggestionsShow) {\n\
+            fromTab = false;\n\
+            //tagsElm.focus();\n\
+        }\n\
+    });\n\
+    tagMatches.insertAfter($this);\n\
+\n\
+    // initialise\n\
+    setSelection();  \n\
+    \n\
+    tag.setTags = function(tags) {\n\
+        userTags = getTags(tags);\n\
+    }\n\
+    \n\
+    return tag;\n\
+        \n\
+};//@ sourceURL=screenwriter/components/autocomplete.js"
+));
+require.register("screenwriter/components/index.js", Function("exports, require, module",
+"var request = require('superagent'),\n\
+    dom = require('dom'),\n\
+    fountain = require('fountain'),\n\
+    debounce = require('debounce'),\n\
+    post = require('post'),\n\
+    autocomplete = require('./autocomplete');\n\
+\n\
+var charAutocomplete,\n\
+    title = \"\",\n\
+    characters = {},\n\
+    tokens = [],\n\
+    height;\n\
+    \n\
+var $editor = dom('.editor'),\n\
+    $viewer = dom('.viewer'),\n\
+    $download = dom('.nav-download'),\n\
+    $viewerScript = dom('.viewer-script');\n\
+\n\
+$viewerScript\n\
+    .addClass('dpi72')\n\
+    .addClass('us-letter');\n\
+\n\
+charAutocomplete = autocomplete.start($editor.find('textarea'));\n\
+\n\
+var parseStringForArray = function(string) {\n\
+    return string.replace(/ *\\([^)]*\\) */g, \"\").replace(/[^a-z0-9\\s]/gi, '').replace(/[_\\s]/g, '');\n\
+}\n\
+\n\
+var removeParentheticals = function(string) {\n\
+    return string.replace(/ *\\([^)]*\\) */g, \"\");\n\
+}\n\
+var stopEvent = function(e) {\n\
+    e.stopPropagation();\n\
+    e.preventDefault();\n\
+}\n\
+\n\
+var resize = function() {\n\
+    var w = window,\n\
+        d = document,\n\
+        e = d.documentElement,\n\
+        g = d.getElementsByTagName('body')[0],\n\
+        x = w.innerWidth || e.clientWidth || g.clientWidth,\n\
+        y = w.innerHeight|| e.clientHeight|| g.clientHeight;\n\
+        \n\
+    $viewer.css('height', y);\n\
+    $editor.css('height', y);\n\
+}\n\
+\n\
+var dragOver = function(e) {\n\
+    dom(this).addClass('over');\n\
+    stopEvent(e);\n\
+}\n\
+var dragLeave = function(e) {\n\
+    dom(this).removeClass('over');\n\
+    stopEvent(e);\n\
+}\n\
+var loadScript = function(e) {\n\
+    stopEvent(e);\n\
+    \n\
+    dom(this).removeClass('over');\n\
+    \n\
+    var file = e.dataTransfer.files[0],\n\
+        reader = new FileReader();\n\
+    \n\
+    if(file) {\n\
+        reader.onload = function(evt) {\n\
+            $editor.find('textarea').val(evt.target.result);\n\
+            generateScript();\n\
+        }\n\
+    \n\
+        reader.readAsText(file);\n\
+    }\n\
+}\n\
+var page = function(html, isTitlePage) {\n\
+    var $output = dom(document.createElement('div')).addClass('viewer-script-page').html(html);\n\
+    \n\
+    if (isTitlePage) {\n\
+        $output.addClass('title-page');\n\
+    } else {\n\
+        /*\n\
+$output.find('div.dialogue.dual').each(function() {\n\
+            dual = dom(this).prev('div.dialogue');\n\
+            dom(this).wrap(dom(document.createElement('div')).addClass('dual-dialogue'));\n\
+            dual.prependTo($(this).parent());\n\
+        });\n\
+*/\n\
+    }\n\
+    return $output;\n\
+}\n\
+var generateScript = function() {\n\
+    fountain.parse($editor.find('textarea').val(), true, function(result) {\n\
+        if(result) {\n\
+            tokens = result;\n\
+            characters = [];\n\
+            $viewerScript.html('');\n\
+            if(result.title && result.html.title_page) {\n\
+                $viewerScript.append(page(result.html.title_page, true));\n\
+                title = result.title || 'Untitled';\n\
+            }\n\
+            $viewerScript.append(page(result.html.script));\n\
+            for(i in result.tokens) {\n\
+                if(result.tokens[i].type == 'character') {\n\
+                    var char = parseStringForArray(result.tokens[i]['text']);\n\
+                    if(!characters[char]) {\n\
+                        characters[char] = removeParentheticals(result.tokens[i]['text']);\n\
+                    }\n\
+                }\n\
+            }\n\
+            charAutocomplete.setTags(characters);\n\
+        } \n\
+    });\n\
+}\n\
+\n\
+$editor.find('textarea').on('keyup', debounce(generateScript, 250));\n\
+$editor.on('dragleave', dragLeave).on('dragover', dragOver).on('drop', loadScript);\n\
+$download.on('click', function() {\n\
+    post('/download', { type: \"fountain\", filename: title, tokens: JSON.stringify(tokens), content: $editor.find('textarea').val() });\n\
+});\n\
+\n\
+if (window.File && window.FileReader && window.FileList && window.Blob) {\n\
+\n\
+} else {\n\
+    alert('The File APIs are not fully supported in this browser.');\n\
+}\n\
+\n\
+window.onresize = resize;\n\
+resize();\n\
+generateScript();//@ sourceURL=screenwriter/components/index.js"
+));
 
 
 

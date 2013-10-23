@@ -9,5 +9,8 @@
         "component/os": "*",
         "visionmedia/superagent": "*"
     },
-    "scripts": [ "components/index.js" ]
+    "scripts": [ 
+        "components/autocomplete.js",
+        "components/index.js"
+    ]
 }
