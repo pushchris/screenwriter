@@ -3,6 +3,8 @@
     "dependencies": {
         "whyohwhyamihere/fountain": "*",
         "whyohwhyamihere/post": "*",
+        "whyohwhyamihere/textarea-height": "*",
+        "whyohwhyamihere/is-mobile": "*",
         "component/debounce": "*",
         "component/bind": "*",
         "component/dom": "*",

@@ -1,8 +1,10 @@
 var request = require('superagent'),
     dom = require('dom'),
     fountain = require('fountain'),
+    height = require('textarea-height'),
     debounce = require('debounce'),
     post = require('post'),
+    mobile = require('is-mobile'),
     autocomplete = require('./autocomplete');
 
 var charAutocomplete,
@@ -21,6 +23,9 @@ $viewerScript
     .addClass('us-letter');
 
 charAutocomplete = autocomplete.start($editor.find('textarea'));
+
+if(mobile())
+    height($editor.find('textarea').get(0), true); 
 
 var parseStringForArray = function(string) {
     return string.replace(/ *\([^)]*\) */g, "").replace(/[^a-z0-9\s]/gi, '').replace(/[_\s]/g, '');
