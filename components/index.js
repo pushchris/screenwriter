@@ -4,6 +4,7 @@ var request = require('superagent'),
     height = require('textarea-height'),
     debounce = require('debounce'),
     post = require('post'),
+    Tip = require('tip'),
     mobile = require('is-mobile'),
     autocomplete = require('./autocomplete');
 
@@ -16,6 +17,7 @@ var charAutocomplete,
 var $editor = dom('.editor'),
     $viewer = dom('.viewer'),
     $download = dom('.nav-download'),
+    $tooltip = dom('.tooltip'),
     $viewerScript = dom('.viewer-script');
 
 $viewerScript
@@ -38,17 +40,20 @@ var stopEvent = function(e) {
     e.stopPropagation();
     e.preventDefault();
 }
-
-var resize = function() {
+var getDimentions = function() {
     var w = window,
         d = document,
         e = d.documentElement,
         g = d.getElementsByTagName('body')[0],
         x = w.innerWidth || e.clientWidth || g.clientWidth,
         y = w.innerHeight|| e.clientHeight|| g.clientHeight;
-        
-    $viewer.css('height', y);
-    $editor.css('height', y);
+    return { x: x, y: y };
+}
+
+var resize = function() {
+    var dim = getDimentions();
+    $viewer.css('height', dim.y);
+    $editor.css('height', dim.y);
 }
 
 var dragOver = function(e) {
@@ -119,7 +124,16 @@ var generateScript = function() {
 $editor.find('textarea').on('keyup', debounce(generateScript, 250));
 $editor.on('dragleave', dragLeave).on('dragover', dragOver).on('drop', loadScript);
 $download.on('click', function() {
-    post('/download', { type: "fountain", filename: title, tokens: JSON.stringify(tokens), content: $editor.find('textarea').val() });
+    var dim = getDimentions();
+    var tip = new Tip($tooltip.html());
+    tip.on("show", function() {
+        dom('.download-option').on('click', function() {
+            post('/download', { type: dom(this).attr('title'), filename: title, tokens: JSON.stringify(tokens), content: $editor.find('textarea').val() });
+        });
+    });
+    tip.show(75, parseInt(dim.y) - 120);
+    
+    //
 });
 
 if (window.File && window.FileReader && window.FileList && window.Blob) {

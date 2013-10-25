@@ -6,8 +6,10 @@
         "whyohwhyamihere/textarea-height": "*",
         "whyohwhyamihere/is-mobile": "*",
         "component/debounce": "*",
+        "component/event": "*",
         "component/bind": "*",
         "component/dom": "*",
+        "component/tip": "*",
         "component/os": "*",
         "visionmedia/superagent": "*"
     },

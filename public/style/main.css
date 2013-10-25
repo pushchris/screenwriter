@@ -285,6 +285,9 @@ label {
   color: #eee;
   z-index: 100;
 }
+.tooltip {
+  display: none;
+}
 .nav-download {
   width: 75px;
   font-size: 11px;
@@ -304,6 +307,48 @@ label {
   left: 0px;
   top: 10px;
   position: absolute;
+}
+.nav-download.large {
+  width: 75px;
+  position: relative;
+  display: inline-block;
+  padding-bottom: 10px;
+}
+.nav-download.large:before {
+  font-size: 32px;
+}
+.tip .tip-arrow,
+.tip .tip-arrow:before {
+  position: absolute;
+  width: 0px;
+  height: 0px;
+  border: 10px solid;
+  border-color: transparent #fff transparent transparent;
+  position: absolute;
+  top: 52px;
+  left: -14px;
+}
+.tip .tip-arrow:before {
+  content: '';
+  border-color: transparent #d2d2d2 transparent transparent;
+  left: -11px;
+  top: -10px;
+  z-index: -1;
+}
+.tip .tip-inner {
+  background: #fff;
+  padding: 5px 10px;
+  -webkit-box-shadow: 0 0 5px rgba(0,0,0,0.1);
+  -moz-box-shadow: 0 0 5px rgba(0,0,0,0.1);
+  -ms-box-shadow: 0 0 5px rgba(0,0,0,0.1);
+  -o-box-shadow: 0 0 5px rgba(0,0,0,0.1);
+  box-shadow: 0 0 5px rgba(0,0,0,0.1);
+  border: 1px solid #d2d2d2;
+  -webkit-border-radius: 4px;
+  -moz-border-radius: 4px;
+  -ms-border-radius: 4px;
+  -o-border-radius: 4px;
+  border-radius: 4px;
 }
 /*------------------------------------*     $EDITOR
 \*------------------------------------*/

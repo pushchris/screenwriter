@@ -6,7 +6,10 @@ block head
 block body
     section(class="editor t50")
         section.nav
-            div(class="nav-download icon-file-text") save
+            div(class="nav-download icon-file-text", id="nav-download") save
+            div.tooltip
+                div(class="nav-download download-option icon-file-text large", title="fountain") fountain
+                div(class="nav-download download-option icon-file-text large", title="fdx") fdx
         textarea=screenplay
     section(class="viewer t50")
         div.viewer-script
