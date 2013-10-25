@@ -126,14 +126,18 @@ $editor.on('dragleave', dragLeave).on('dragover', dragOver).on('drop', loadScrip
 $download.on('click', function() {
     var dim = getDimentions();
     var tip = new Tip($tooltip.html());
+    var hide = function() {
+        $editor.find('textarea').off("click", hide);
+        tip.hide();
+    }
     tip.on("show", function() {
         dom('.download-option').on('click', function() {
             post('/download', { type: dom(this).attr('title'), filename: title, tokens: JSON.stringify(tokens), content: $editor.find('textarea').val() });
+            tip.hide();
         });
+        $editor.find('textarea').on('click', hide);   
     });
     tip.show(75, parseInt(dim.y) - 120);
-    
-    //
 });
 
 if (window.File && window.FileReader && window.FileList && window.Blob) {

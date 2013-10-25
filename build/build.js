@@ -5081,14 +5081,18 @@ $editor.on('dragleave', dragLeave).on('dragover', dragOver).on('drop', loadScrip
 $download.on('click', function() {\n\
     var dim = getDimentions();\n\
     var tip = new Tip($tooltip.html());\n\
+    var hide = function() {\n\
+        $editor.find('textarea').off(\"click\", hide);\n\
+        tip.hide();\n\
+    }\n\
     tip.on(\"show\", function() {\n\
         dom('.download-option').on('click', function() {\n\
             post('/download', { type: dom(this).attr('title'), filename: title, tokens: JSON.stringify(tokens), content: $editor.find('textarea').val() });\n\
+            tip.hide();\n\
         });\n\
+        $editor.find('textarea').on('click', hide);   \n\
     });\n\
     tip.show(75, parseInt(dim.y) - 120);\n\
-    \n\
-    //\n\
 });\n\
 \n\
 if (window.File && window.FileReader && window.FileList && window.Blob) {\n\
